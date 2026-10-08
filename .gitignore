@@ -1,0 +1,41 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+.envrc
+
+# Signing keys and certificates
+*.p8
+*.p12
+*.pem
+*.key
+*.mobileprovision
+GoogleService-Info.plist
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+build/
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+ios/
+android/
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
