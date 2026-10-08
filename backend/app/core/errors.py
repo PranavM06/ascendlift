@@ -18,13 +18,19 @@ INTERNAL_ERROR_MESSAGE = "Internal server error"
 class AppError(Exception):
     """An expected failure whose message is safe to show to the client."""
 
-    def __init__(self, status_code: int, message: str) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        message: str,
+        headers: Mapping[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.message = message
+        self.headers = headers
 
 
-def _error_response(
+def error_response(
     status_code: int, message: str, headers: Mapping[str, str] | None = None
 ) -> JSONResponse:
     return JSONResponse(
@@ -51,7 +57,7 @@ def _client_message(exc: StarletteHTTPException) -> str:
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
-        return _error_response(exc.status_code, exc.message)
+        return error_response(exc.status_code, exc.message, exc.headers)
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_exception(
@@ -59,13 +65,13 @@ def register_error_handlers(app: FastAPI) -> None:
     ) -> Response:
         if not is_body_allowed_for_status_code(exc.status_code):
             return Response(status_code=exc.status_code, headers=exc.headers)
-        return _error_response(exc.status_code, _client_message(exc), exc.headers)
+        return error_response(exc.status_code, _client_message(exc), exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
-        return _error_response(422, _describe_validation_errors(exc))
+        return error_response(422, _describe_validation_errors(exc))
 
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
@@ -75,4 +81,4 @@ def register_error_handlers(app: FastAPI) -> None:
             request.url.path,
             exc_info=exc,
         )
-        return _error_response(500, INTERNAL_ERROR_MESSAGE)
+        return error_response(500, INTERNAL_ERROR_MESSAGE)

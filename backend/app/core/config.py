@@ -1,12 +1,15 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import field_validator
+from fastapi import Depends
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
 DATABASE_DRIVER = "postgresql+psycopg"
+MIN_JWT_SECRET_LENGTH = 32
+EXPO_GO_AUDIENCE = "host.exp.Exponent"
 
 
 class Settings(BaseSettings):
@@ -21,6 +24,13 @@ class Settings(BaseSettings):
 
     environment: Literal["development", "test", "production"] = "development"
     database_url: str
+    # Signs access tokens. Anyone who knows it can impersonate any user.
+    jwt_secret: SecretStr = Field(min_length=MIN_JWT_SECRET_LENGTH)
+    # The app identifiers Apple identity tokens may be issued for: the bundle id,
+    # or "host.exp.Exponent" while developing in Expo Go.
+    apple_audiences: tuple[str, ...] = Field(min_length=1)
+    access_token_ttl_minutes: int = Field(default=15, gt=0)
+    refresh_token_ttl_days: int = Field(default=30, gt=0)
 
     @field_validator("database_url")
     @classmethod
@@ -33,7 +43,23 @@ class Settings(BaseSettings):
             raise ValueError(f"must start with '{DATABASE_DRIVER}://'")
         return value
 
+    @model_validator(mode="after")
+    def forbid_expo_go_audience_in_production(self) -> Self:
+        # Every Expo Go app shares this audience, so trusting it would let any of
+        # them obtain Apple tokens this API accepts.
+        if (
+            self.environment == "production"
+            and EXPO_GO_AUDIENCE in self.apple_audiences
+        ):
+            raise ValueError(
+                f"apple_audiences must not include '{EXPO_GO_AUDIENCE}' in production"
+            )
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+SettingsDep = Annotated[Settings, Depends(get_settings)]

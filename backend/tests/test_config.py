@@ -61,6 +61,46 @@ def test_settings_error_does_not_reveal_the_database_password(
     assert "hunter2" not in str(error.value)
 
 
+def test_production_settings_reject_the_shared_expo_go_audience(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange: every Expo Go app shares this audience, so it is unsafe to trust.
+    monkeypatch.setenv("ASCENDLIFT_ENVIRONMENT", "production")
+    monkeypatch.setenv(
+        "ASCENDLIFT_APPLE_AUDIENCES", '["com.ascendlift.app", "host.exp.Exponent"]'
+    )
+
+    # Act / Assert
+    with pytest.raises(ValidationError, match="host.exp.Exponent"):
+        Settings(_env_file=None)
+
+
+def test_production_settings_accept_a_real_bundle_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange
+    monkeypatch.setenv("ASCENDLIFT_ENVIRONMENT", "production")
+    monkeypatch.setenv("ASCENDLIFT_APPLE_AUDIENCES", '["com.ascendlift.app"]')
+
+    # Act
+    settings = Settings(_env_file=None)
+
+    # Assert
+    assert settings.apple_audiences == ("com.ascendlift.app",)
+
+
+@pytest.mark.parametrize("secret", ["", "too-short"])
+def test_settings_reject_a_missing_or_short_jwt_secret(
+    monkeypatch: pytest.MonkeyPatch, secret: str
+) -> None:
+    # Arrange
+    monkeypatch.setenv("ASCENDLIFT_JWT_SECRET", secret)
+
+    # Act / Assert
+    with pytest.raises(ValidationError, match="jwt_secret"):
+        Settings(_env_file=None)
+
+
 def test_settings_reject_unknown_environment_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

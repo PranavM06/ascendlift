@@ -18,13 +18,33 @@ Needs [uv](https://docs.astral.sh/uv/) and Docker Desktop.
 ```bash
 docker compose up -d            # Postgres on localhost:5432
 cd backend
-cp .env.example .env
+cp .env.example .env            # then set ASCENDLIFT_JWT_SECRET (see the file)
 uv sync
 uv run alembic upgrade head     # create or update the tables
 uv run uvicorn app.main:app --reload
 ```
 
 `GET http://localhost:8000/health` returns `{"success": true, "data": {"status": "ok", "database": "ok"}, "error": null}`. Interactive API docs are at `/docs`.
+
+## API
+
+Every response has the shape `{"success": bool, "data": ..., "error": string | null}`.
+
+| Method and path | Auth | What it does |
+| --- | --- | --- |
+| `GET /health` | none | Checks the service and its database |
+| `POST /auth/apple` | none | Body `{identity_token, nonce, name?}`. Verifies the Apple identity token, creates the user on first sign-in, returns `{access_token, refresh_token, token_type, expires_in}` |
+| `POST /auth/refresh` | none | Body `{refresh_token}`. Returns a new pair; the old refresh token stops working |
+| `POST /auth/logout` | none | Body `{refresh_token}`. Revokes it |
+| `GET /users/me` | bearer | The signed-in user's profile |
+| `PATCH /users/me` | bearer | Body `{name?, timezone?, unit_preference?}`. Changes only the fields sent |
+
+Sign-in works like this:
+
+- The app makes a random nonce, gives Apple its SHA-256 hex digest, and sends the raw nonce to `/auth/apple` with the token Apple returns.
+- Access tokens last 15 minutes. Send them as `Authorization: Bearer <token>`.
+- Refresh tokens last 30 days and work once. Presenting one that was already used signs out every session descended from that sign-in, since it may have been stolen.
+- The `/auth/*` endpoints allow 10 requests a minute per client address.
 
 ## Changing the schema
 
