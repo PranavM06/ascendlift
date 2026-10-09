@@ -8,6 +8,7 @@ The design is in [docs/AscendLift MVP Design Doc.md](docs/AscendLift%20MVP%20Des
 | Path | What |
 | --- | --- |
 | `backend/` | FastAPI service (Python 3.12, SQLAlchemy, Postgres) |
+| `mobile/` | iOS app (Expo, React Native, TypeScript) |
 | `docker-compose.yml` | Local Postgres |
 | `docs/` | Design doc |
 
@@ -25,6 +26,32 @@ uv run uvicorn app.main:app --reload
 ```
 
 `GET http://localhost:8000/health` returns `{"success": true, "data": {"status": "ok", "database": "ok"}, "error": null}`. Interactive API docs are at `/docs`.
+
+## Running the app on an iPhone
+
+Needs Node and the Expo Go app on the phone, with the phone and this Mac on the same Wi-Fi.
+
+```bash
+# Terminal 1: backend, listening on the network so the phone can reach it
+cd backend
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# Terminal 2: app
+cd mobile
+cp .env.example .env            # then set EXPO_PUBLIC_API_URL to this Mac's Wi-Fi address
+npm install
+npx expo start                  # scan the QR code with the iPhone camera
+```
+
+Sign in with Apple works in Expo Go because the backend accepts Expo Go's audience (`host.exp.Exponent`) in development. A standalone build needs the app's own bundle id in `ASCENDLIFT_APPLE_AUDIENCES`.
+
+App checks, run from `mobile/`:
+
+```bash
+npx tsc --noEmit
+npx expo lint
+npm test
+```
 
 ## API
 
