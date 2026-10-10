@@ -35,11 +35,13 @@ from app.auth.apple import AppleTokenVerifier  # noqa: E402
 from app.auth.deps import get_apple_verifier  # noqa: E402
 from app.core.rate_limit import limiter  # noqa: E402
 from app.db.session import get_db, get_engine  # noqa: E402
+from app.foods.usda import get_food_source  # noqa: E402
 from app.main import create_app  # noqa: E402
 from tests.support import (  # noqa: E402
     TEST_APPLE_AUDIENCE,
     AppleTokenMinter,
     FakeAppleKeys,
+    FakeFoodSource,
     generate_rsa_key,
     jwks_for,
 )
@@ -93,6 +95,11 @@ def apple_verifier(apple_private_key: rsa.RSAPrivateKey) -> AppleTokenVerifier:
 
 
 @pytest.fixture
+def food_source() -> FakeFoodSource:
+    return FakeFoodSource()
+
+
+@pytest.fixture
 def app() -> FastAPI:
     return create_app()
 
@@ -105,15 +112,20 @@ def client(app: FastAPI) -> Iterator[TestClient]:
 
 @pytest.fixture
 def api_client(
-    app: FastAPI, db_session: Session, apple_verifier: AppleTokenVerifier
+    app: FastAPI,
+    db_session: Session,
+    apple_verifier: AppleTokenVerifier,
+    food_source: FakeFoodSource,
 ) -> Iterator[TestClient]:
-    """A client whose requests use the rolled-back session and fake Apple keys."""
+    """A client whose requests use the rolled-back session, fake Apple keys and
+    a fake USDA."""
 
     def use_test_session() -> Iterator[Session]:
         yield db_session
 
     app.dependency_overrides[get_db] = use_test_session
     app.dependency_overrides[get_apple_verifier] = lambda: apple_verifier
+    app.dependency_overrides[get_food_source] = lambda: food_source
     with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
     app.dependency_overrides.clear()

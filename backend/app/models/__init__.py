@@ -1,6 +1,6 @@
 """Importing this package registers every table on Base.metadata."""
 
-from app.models.diet import Food, FoodLogEntry
+from app.models.diet import Food, FoodLogEntry, FoodSearch
 from app.models.enums import (
     Equipment,
     InsightStatus,
@@ -27,6 +27,7 @@ __all__ = [
     "Exercise",
     "Food",
     "FoodLogEntry",
+    "FoodSearch",
     "Goal",
     "InsightStatus",
     "Meal",

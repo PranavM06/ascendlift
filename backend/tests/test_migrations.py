@@ -23,6 +23,7 @@ EXPECTED_TABLES = {
     "workout_sets",
     "foods",
     "food_log_entries",
+    "food_searches",
     "daily_insights",
 }
 

@@ -9,6 +9,8 @@ from app.core.errors import error_response
 AUTH_RATE_LIMIT = "10/minute"
 # Room for logging sets quickly, while stopping a runaway client.
 WRITE_RATE_LIMIT = "120/minute"
+# Room for searching as you type; each uncached search costs a USDA request.
+FOOD_SEARCH_RATE_LIMIT = "60/minute"
 TOO_MANY_REQUESTS = 429
 RATE_LIMITED_MESSAGE = "Too many requests. Try again shortly."
 

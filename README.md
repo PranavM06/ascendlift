@@ -25,6 +25,8 @@ uv run alembic upgrade head     # create or update the tables
 uv run uvicorn app.main:app --reload
 ```
 
+Food search works out of the box with USDA's shared `DEMO_KEY`, which allows only a few dozen searches an hour. For daily use, get a free key at <https://fdc.nal.usda.gov/api-key-signup> and set `ASCENDLIFT_USDA_API_KEY` in `.env`; production refuses to start with the demo key.
+
 `GET http://localhost:8000/health` returns `{"success": true, "data": {"status": "ok", "database": "ok"}, "error": null}`. Interactive API docs are at `/docs`.
 
 ## Running the app on an iPhone
@@ -83,8 +85,16 @@ Every response has the shape `{"success": bool, "data": ..., "error": string | n
 | `POST /workouts/{id}/sets` | bearer | Body `{exercise_id, reps, weight_kg, rpe?}`. Appends a set and returns `{id, exercise: {id, name}, position, reps, weight_kg, rpe}` |
 | `PATCH /workouts/{id}/sets/{set_id}` | bearer | Body `{reps?, weight_kg?, rpe?}`. Changes only the fields sent; `rpe: null` clears it |
 | `DELETE /workouts/{id}/sets/{set_id}` | bearer | Removes the set |
+| `GET /foods?search=` | bearer | Up to 25 foods matching the search (at least 2 characters), best match first, each `{id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g}`. Nutrients are for one serving: the label's serving for packaged foods, 100 g for generic ones. 503 if USDA cannot be reached and the search is not cached |
+| `GET /foods/recent` | bearer | The 20 foods the user logged most recently, each once, latest first |
+| `GET /food-log?entry_date=` | bearer | One day of the user's food log: `{entry_date, totals, entries}`. `totals` is `{calories, protein_g, carbs_g, fat_g}`; an entry is `{id, food, servings, meal, entry_date, calories, protein_g, carbs_g, fat_g}` with nutrients for the servings logged |
+| `POST /food-log` | bearer | Body `{food_id, servings, meal, entry_date}`. `meal` is `breakfast`, `lunch`, `dinner` or `snack`; `servings` is above 0, at most 100, with up to two decimal places. At most 200 entries a day |
+| `PATCH /food-log/{id}` | bearer | Body `{servings?, meal?}`. Changes only the fields sent |
+| `DELETE /food-log/{id}` | bearer | Removes the entry |
 
 Weights are always kilograms: at most four decimal places going in, and a string such as `"102.0583"` coming out so no precision is lost. RPE runs from 1 to 10 in half steps. Endpoints that write allow 120 requests a minute per client address.
+
+Food data comes from [USDA FoodData Central](https://fdc.nal.usda.gov/). The backend keeps every food it has seen and remembers each search for 30 days, so a repeated search does not reach USDA at all. Food search allows 60 requests a minute per client address. Dates such as `entry_date` are the user's own calendar day, as `YYYY-MM-DD`.
 
 Sign-in works like this:
 
