@@ -159,6 +159,13 @@ describe('describeRecords', () => {
     expect(describeRecords(records, 'kg')).toBe('Best: 100 kg × 20');
   });
 
+  test('counts reps alone for an exercise done without added weight', () => {
+    const bodyweight = { ...record, reps: 12, weightKg: 0, estimated1rmKg: 0 };
+    const records = { heaviest: bodyweight, bestEstimated1rm: bodyweight };
+
+    expect(describeRecords(records, 'kg')).toBe('Best: 12 reps');
+  });
+
   test('is null before the exercise has any record', () => {
     expect(describeRecords({ heaviest: null, bestEstimated1rm: null }, 'kg')).toBeNull();
   });

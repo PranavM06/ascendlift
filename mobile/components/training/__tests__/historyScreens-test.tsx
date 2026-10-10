@@ -33,13 +33,14 @@ const SUMMARY = {
 };
 
 async function renderWithKgProfile(screenElement: ReactElement) {
-  // The profile is cached and never refetched, so weights show in kg at once.
+  // The profile is cached and never goes stale, so weights show in kg at once.
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, gcTime: Infinity, staleTime: Infinity },
+      queries: { retry: false, gcTime: Infinity },
       mutations: { retry: false, gcTime: Infinity },
     },
   });
+  queryClient.setQueryDefaults(PROFILE_QUERY_KEY, { staleTime: Infinity });
   queryClient.setQueryData(PROFILE_QUERY_KEY, { unitPreference: 'kg' });
   await render(<QueryClientProvider client={queryClient}>{screenElement}</QueryClientProvider>);
 }
@@ -137,6 +138,11 @@ describe('WorkoutDetailScreen', () => {
     // Assert
     await waitFor(() => expect(routerBackMock).toHaveBeenCalledTimes(1));
     expect(deleteWorkoutMock.mock.calls[0][0]).toBe('workout-1');
+    // The deleted workout is not asked for again, which would fail and show an error.
+    expect(fetchWorkoutMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Couldn't load this workout.")).toBeNull();
+    // The button returns from "Deleting…" once the request has fully settled.
+    expect(await screen.findByText('Delete workout')).toBeTruthy();
     alert.mockRestore();
   });
 

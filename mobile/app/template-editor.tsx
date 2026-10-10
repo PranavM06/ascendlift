@@ -14,6 +14,7 @@ import {
   setDraftNotes,
   useTemplateDraft,
   type DraftExercise,
+  type TemplateDraft,
 } from '@/src/training/templateDraft';
 import { useDeleteTemplate, useSaveTemplate } from '@/src/training/useTemplates';
 
@@ -96,7 +97,12 @@ export default function TemplateEditorScreen() {
   const draft = useTemplateDraft();
   const save = useSaveTemplate();
   const remove = useDeleteTemplate();
-  const [formError, setFormError] = useState<string | null>(null);
+  // The problem found at the last Save, with the draft it was found in. Any
+  // change replaces the draft object, so the message goes once it is edited.
+  const [rejected, setRejected] = useState<{ draft: TemplateDraft; message: string } | null>(
+    null
+  );
+  const formError = rejected !== null && rejected.draft === draft ? rejected.message : null;
 
   const isBusy = save.isPending || remove.isPending;
   const requestError = save.error ?? remove.error;
@@ -114,10 +120,10 @@ export default function TemplateEditorScreen() {
   function handleSave() {
     const parsed = parseDraft(draft);
     if (!parsed.ok) {
-      setFormError(parsed.message);
+      setRejected({ draft, message: parsed.message });
       return;
     }
-    setFormError(null);
+    setRejected(null);
     leaveAfter(save.mutateAsync({ templateId: draft.templateId, content: parsed.content }));
   }
 

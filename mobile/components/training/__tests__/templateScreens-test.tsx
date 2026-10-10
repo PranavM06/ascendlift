@@ -203,6 +203,18 @@ describe('TemplateEditorScreen', () => {
     expect(createTemplateMock).not.toHaveBeenCalled();
   });
 
+  test('drops the message once the draft is changed', async () => {
+    // Arrange
+    await renderScreen(<TemplateEditorScreen />);
+    await fireEvent.press(screen.getByText('Save template'));
+
+    // Act
+    await fireEvent.changeText(screen.getByLabelText('Template name'), 'Leg Day');
+
+    // Assert
+    expect(screen.queryByText('Give the template a name.')).toBeNull();
+  });
+
   test('opens the exercise picker in template mode', async () => {
     // Arrange
     await renderScreen(<TemplateEditorScreen />);

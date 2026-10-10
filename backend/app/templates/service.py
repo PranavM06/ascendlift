@@ -72,8 +72,12 @@ def _own_template(
 def require_own_template(
     db: Session, user_id: uuid.UUID, template_id: uuid.UUID
 ) -> None:
-    """Raise the 404 unless the template belongs to the user."""
-    _own_template(db, user_id, template_id)
+    """Raise the 404 unless the template belongs to the user.
+
+    The template stays locked until the caller's transaction ends, so it cannot
+    be deleted between this check and the caller linking to it.
+    """
+    _own_template(db, user_id, template_id, lock=True)
 
 
 def _items_by_template(

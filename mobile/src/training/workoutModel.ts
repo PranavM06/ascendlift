@@ -83,6 +83,10 @@ export function describeRecords(records: ExerciseRecords, unit: UnitPreference):
   if (heaviest === null) {
     return null;
   }
+  if (heaviest.weightKg === 0) {
+    // Done without added weight, so only the reps say anything.
+    return `Best: ${heaviest.reps} reps`;
+  }
   const best = `Best: ${formatWeight(heaviest.weightKg, unit)} × ${heaviest.reps}`;
   const estimate = bestEstimated1rm?.estimated1rmKg ?? null;
   return estimate === null ? best : `${best} · est. 1RM ${formatWeight(estimate, unit)}`;

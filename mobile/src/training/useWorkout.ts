@@ -31,6 +31,8 @@ const WORKOUTS_QUERY_KEY = ['workouts'] as const;
 export const ACTIVE_WORKOUT_QUERY_KEY = [...WORKOUTS_QUERY_KEY, 'active'] as const;
 const LAST_SETS_QUERY_KEY = [...WORKOUTS_QUERY_KEY, 'last-sets'] as const;
 const HISTORY_QUERY_KEY = [...WORKOUTS_QUERY_KEY, 'history'] as const;
+/** Second part of the key of a single workout's query. */
+const DETAIL_KEY_PART = 'detail';
 // What was lifted last time cannot change while a workout is in progress.
 const LAST_SETS_STALE_MS = 5 * 60 * 1000;
 
@@ -69,7 +71,7 @@ export function useWorkoutHistory() {
 
 export function useWorkoutDetail(workoutId: string) {
   return useQuery({
-    queryKey: [...WORKOUTS_QUERY_KEY, 'detail', workoutId],
+    queryKey: [...WORKOUTS_QUERY_KEY, DETAIL_KEY_PART, workoutId],
     queryFn: () => fetchWorkout(workoutId),
   });
 }
@@ -87,7 +89,15 @@ export function useDeleteFinishedWorkout() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteWorkout,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: WORKOUTS_QUERY_KEY }),
+    onSuccess: () => {
+      // Refresh history, records and "last time" in the background. The
+      // detail of the workout just deleted is left alone: asking for it again
+      // would fail and show an error on the screen that is about to close.
+      void queryClient.invalidateQueries({
+        queryKey: WORKOUTS_QUERY_KEY,
+        predicate: (query) => query.queryKey[1] !== DETAIL_KEY_PART,
+      });
+    },
   });
 }
 
