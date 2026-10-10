@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput } from 'react-native';
 
@@ -13,7 +13,7 @@ import {
   type Exercise,
 } from '@/src/api/exercises';
 import { userMessage } from '@/src/api/http';
-import { pickExercise } from '@/src/training/pickedExercises';
+import { deliverPick, toPickTarget } from '@/src/training/pickedExercises';
 import { useActiveWorkout } from '@/src/training/useWorkout';
 
 // Long enough that typing a word sends one search, not one per letter.
@@ -36,6 +36,9 @@ function describeExercise(exercise: Exercise): string {
 
 export default function ExercisePickerScreen() {
   const textColor = useThemeColor({}, 'text');
+  // The picker adds to the workout in progress unless it was opened with
+  // target=template, by the template editor.
+  const target = toPickTarget(useLocalSearchParams<{ target?: string }>().target);
   const activeWorkout = useActiveWorkout();
   const [searchText, setSearchText] = useState('');
   const search = useDebounced(searchText.trim(), SEARCH_DEBOUNCE_MS);
@@ -51,17 +54,15 @@ export default function ExercisePickerScreen() {
   const hiddenCount = (results.data?.total ?? 0) - exercises.length;
 
   function handlePick(exercise: Exercise) {
-    if (workoutId === undefined) {
-      return;
-    }
-    pickExercise(workoutId, { id: exercise.id, name: exercise.name });
+    deliverPick(target, { id: exercise.id, name: exercise.name }, workoutId);
     router.back();
   }
 
   function handleCreate() {
-    // Replaces the picker, so saving the new exercise returns to the workout.
+    // Replaces the picker, so saving the new exercise returns to where the
+    // picker was opened from.
     const name = searchText.trim().slice(0, MAX_EXERCISE_NAME_LENGTH);
-    router.replace({ pathname: '/new-exercise', params: { name } });
+    router.replace({ pathname: '/new-exercise', params: { name, target } });
   }
 
   return (

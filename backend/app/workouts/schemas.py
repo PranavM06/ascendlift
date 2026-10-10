@@ -5,9 +5,12 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.responses import MAX_OFFSET
 from app.db.base import MAX_RPE, MIN_RPE
-from app.workouts.service import LastSets, LoggedSet, WorkoutDetail
+from app.workouts.service import LastSets, LoggedSet, WorkoutDetail, WorkoutSummary
 
+DEFAULT_HISTORY_PAGE_SIZE = 20
+MAX_HISTORY_PAGE_SIZE = 50
 MAX_REPS = 1000
 MAX_WEIGHT_KG = 2000
 # Matches the four decimal places the weight columns keep.
@@ -19,6 +22,13 @@ WeightKg = Annotated[
     Decimal, Field(ge=0, le=MAX_WEIGHT_KG, decimal_places=WEIGHT_DECIMAL_PLACES)
 ]
 Rpe = Annotated[Decimal, Field(ge=MIN_RPE, le=MAX_RPE, multiple_of=RPE_STEP)]
+
+
+class WorkoutStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # The template to start from; left out for a blank workout.
+    template_id: uuid.UUID | None = None
 
 
 class SetCreate(BaseModel):
@@ -94,6 +104,63 @@ class WorkoutResponse(BaseModel):
             template_id=workout.template_id,
             sets=[SetResponse.from_logged_set(logged) for logged in detail.sets],
         )
+
+
+class HistoryQuery(BaseModel):
+    """Query parameters for listing finished workouts."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    limit: int = Field(
+        default=DEFAULT_HISTORY_PAGE_SIZE, ge=1, le=MAX_HISTORY_PAGE_SIZE
+    )
+    offset: int = Field(default=0, ge=0, le=MAX_OFFSET)
+
+
+class WorkoutSummaryResponse(BaseModel):
+    id: uuid.UUID
+    started_at: datetime
+    ended_at: datetime | None
+    template_id: uuid.UUID | None
+    set_count: int
+    # Each exercise once, in the order it was first logged.
+    exercise_names: list[str]
+    # Weight times reps, added up over every set.
+    volume_kg: Decimal
+
+    @classmethod
+    def from_summary(cls, summary: WorkoutSummary) -> Self:
+        workout = summary.workout
+        return cls(
+            id=workout.id,
+            started_at=workout.started_at,
+            ended_at=workout.ended_at,
+            template_id=workout.template_id,
+            set_count=summary.set_count,
+            exercise_names=summary.exercise_names,
+            volume_kg=summary.volume_kg,
+        )
+
+
+class RecordSetResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    workout_id: uuid.UUID
+    # When the workout that holds the set started.
+    achieved_at: datetime
+    reps: int
+    weight_kg: Decimal
+    # Null when the set has too many reps for a trustworthy estimate.
+    estimated_1rm_kg: Decimal | None
+
+
+class RecordsResponse(BaseModel):
+    """A user's best sets of one exercise. Null until they have logged it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    heaviest: RecordSetResponse | None
+    best_estimated_1rm: RecordSetResponse | None
 
 
 class LastSetsResponse(BaseModel):

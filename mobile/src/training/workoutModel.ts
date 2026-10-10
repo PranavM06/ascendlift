@@ -1,6 +1,7 @@
+import type { TemplateExercise } from '@/src/api/templates';
 import type { UnitPreference } from '@/src/api/users';
-import type { ExerciseRef, WorkoutSet } from '@/src/api/workouts';
-import { formatWeight, parseWeight, toKg } from '@/src/units/weight';
+import type { ExerciseRecords, ExerciseRef, WorkoutSet } from '@/src/api/workouts';
+import { formatWeight, KG_PER_LB, parseWeight, toKg, UNIT_LABEL } from '@/src/units/weight';
 
 export type ExerciseGroup = { exercise: ExerciseRef; sets: WorkoutSet[] };
 
@@ -59,6 +60,44 @@ export function suggestNextSet(
 export function describeSet(set: WorkoutSet, unit: UnitPreference): string {
   const rpe = set.rpe === null ? '' : ` @ ${set.rpe}`;
   return `${formatWeight(set.weightKg, unit)} × ${set.reps}${rpe}`;
+}
+
+/** A workout's total volume in the user's unit, such as "3,307 lb". */
+export function formatVolume(volumeKg: number, unit: UnitPreference, locale?: string): string {
+  const volume = unit === 'lbs' ? volumeKg / KG_PER_LB : volumeKg;
+  return `${Math.round(volume).toLocaleString(locale)} ${UNIT_LABEL[unit]}`;
+}
+
+/** The day a workout happened, such as "Fri, Oct 9". */
+export function formatWorkoutDate(startedAt: string, locale?: string): string {
+  return new Date(startedAt).toLocaleDateString(locale, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/** One line on the user's records for an exercise; null when they have none. */
+export function describeRecords(records: ExerciseRecords, unit: UnitPreference): string | null {
+  const { heaviest, bestEstimated1rm } = records;
+  if (heaviest === null) {
+    return null;
+  }
+  if (heaviest.weightKg === 0) {
+    // Done without added weight, so only the reps say anything.
+    return `Best: ${heaviest.reps} reps`;
+  }
+  const best = `Best: ${formatWeight(heaviest.weightKg, unit)} × ${heaviest.reps}`;
+  const estimate = bestEstimated1rm?.estimated1rmKg ?? null;
+  return estimate === null ? best : `${best} · est. 1RM ${formatWeight(estimate, unit)}`;
+}
+
+/** What a template asks for on one exercise, such as "Plan: 3 × 5–8". */
+export function describePlan(plan: TemplateExercise, unit: UnitPreference): string {
+  const reps = plan.repMin === plan.repMax ? `${plan.repMin}` : `${plan.repMin}–${plan.repMax}`;
+  const weight = plan.targetWeightKg === null ? '' : ` at ${formatWeight(plan.targetWeightKg, unit)}`;
+  const rpe = plan.targetRpe === null ? '' : ` @ ${plan.targetRpe}`;
+  return `Plan: ${plan.targetSets} × ${reps}${weight}${rpe}`;
 }
 
 /** Reads the three fields of the set form, or says what is wrong with them. */

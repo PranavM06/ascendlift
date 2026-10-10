@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import type { ExerciseRef } from '@/src/api/workouts';
+import { addDraftExercise } from '@/src/training/templateDraft';
 
 type PickedExercisesState = {
   /** The workout the picks belong to, so they never carry into the next one. */
@@ -26,6 +27,26 @@ export function pickExercise(workoutId: string, exercise: ExerciseRef): void {
     const isAlreadyPicked = current.some((picked) => picked.id === exercise.id);
     return { workoutId, exercises: isAlreadyPicked ? current : [...current, exercise] };
   });
+}
+
+/** Where an exercise chosen in the picker goes. */
+export type PickTarget = 'workout' | 'template';
+
+/** Hands a chosen exercise to the workout in progress or to the template being edited. */
+export function deliverPick(
+  target: PickTarget,
+  exercise: ExerciseRef,
+  workoutId: string | undefined
+): void {
+  if (target === 'template') {
+    addDraftExercise(exercise);
+  } else if (workoutId !== undefined) {
+    pickExercise(workoutId, exercise);
+  }
+}
+
+export function toPickTarget(param: unknown): PickTarget {
+  return param === 'template' ? 'template' : 'workout';
 }
 
 export function clearPickedExercises(): void {

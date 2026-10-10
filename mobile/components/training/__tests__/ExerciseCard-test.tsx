@@ -5,6 +5,7 @@ import { ExerciseCard } from '@/components/training/ExerciseCard';
 import {
   deleteSet,
   fetchLastSets,
+  fetchRecords,
   logSet,
   updateSet,
   type WorkoutSet,
@@ -17,6 +18,7 @@ const fetchLastSetsMock = jest.mocked(fetchLastSets);
 const logSetMock = jest.mocked(logSet);
 const deleteSetMock = jest.mocked(deleteSet);
 const updateSetMock = jest.mocked(updateSet);
+const fetchRecordsMock = jest.mocked(fetchRecords);
 
 const SQUAT = { id: 'squat', name: 'Barbell Squat' };
 // 225 lb, as the backend stores it.
@@ -57,6 +59,8 @@ beforeEach(() => {
   updateSetMock.mockReset();
   fetchLastSetsMock.mockReset();
   fetchLastSetsMock.mockResolvedValue(null);
+  fetchRecordsMock.mockReset();
+  fetchRecordsMock.mockResolvedValue({ heaviest: null, bestEstimated1rm: null });
 });
 
 test('pre-fills the form from last time, in the user’s unit', async () => {
@@ -74,6 +78,59 @@ test('pre-fills the form from last time, in the user’s unit', async () => {
   expect(await screen.findByText('Last time: 225 lb × 5')).toBeTruthy();
   expect(screen.getByLabelText('Weight in lb').props.value).toBe('225');
   expect(screen.getByLabelText('Reps').props.value).toBe('5');
+});
+
+test('shows the template’s plan and starts the form from it', async () => {
+  // Arrange
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  const plan = {
+    id: 'item-1',
+    exercise: SQUAT,
+    position: 1,
+    targetSets: 3,
+    repMin: 5,
+    repMax: 8,
+    targetWeightKg: 102.0583,
+    targetRpe: null,
+  };
+
+  // Act
+  await render(
+    <QueryClientProvider client={queryClient}>
+      <ExerciseCard
+        workoutId="workout-1"
+        group={{ exercise: SQUAT, sets: [] }}
+        unit="lbs"
+        plan={plan}
+      />
+    </QueryClientProvider>
+  );
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+
+  // Assert
+  expect(screen.getByText('Plan: 3 × 5–8 at 225 lb')).toBeTruthy();
+  expect(screen.getByLabelText('Weight in lb').props.value).toBe('225');
+  expect(screen.getByLabelText('Reps').props.value).toBe('5');
+});
+
+test('shows the user’s records for the exercise', async () => {
+  // Arrange
+  const record = {
+    workoutId: 'workout-0',
+    achievedAt: '2026-10-02T18:00:00Z',
+    reps: 5,
+    weightKg: 102.0583,
+    estimated1rmKg: 119.068,
+  };
+  fetchRecordsMock.mockResolvedValue({ heaviest: record, bestEstimated1rm: record });
+
+  // Act
+  await renderCard();
+
+  // Assert
+  expect(await screen.findByText('Best: 225 lb × 5 · est. 1RM 262.5 lb')).toBeTruthy();
 });
 
 test('re-logs an off-plate weight unchanged when the pre-fill is not edited', async () => {
@@ -205,6 +262,7 @@ test('brings the new-set form back when the set being edited disappears', async 
   );
   const otherSet = { ...SET_225_LB, id: 'set-2', position: 2 };
   const view = await render(cardWith([SET_225_LB, otherSet]));
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
   await fireEvent.press(screen.getByLabelText('Edit set 1 of Barbell Squat'));
 
   // Act: the set is removed elsewhere, such as from another device.

@@ -1,19 +1,24 @@
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from app.auth.deps import CurrentUser
 from app.core.rate_limit import WRITE_RATE_LIMIT, limiter
-from app.core.responses import ApiResponse, ok
+from app.core.responses import ApiResponse, Page, ok
 from app.db.session import DbSession
 from app.workouts import service
 from app.workouts.schemas import (
+    HistoryQuery,
     LastSetsResponse,
+    RecordsResponse,
     SetCreate,
     SetResponse,
     SetUpdate,
     WorkoutResponse,
+    WorkoutStart,
+    WorkoutSummaryResponse,
 )
 
 CREATED = 201
@@ -27,13 +32,42 @@ router = APIRouter(prefix="/workouts", tags=["workouts"])
 @router.post("", status_code=CREATED)
 @limiter.limit(WRITE_RATE_LIMIT)
 def start_workout(
-    request: Request, user: CurrentUser, db: DbSession
+    request: Request,
+    user: CurrentUser,
+    db: DbSession,
+    # The body may be left out entirely to start a blank workout.
+    body: WorkoutStart | None = None,
 ) -> ApiResponse[WorkoutResponse]:
-    detail = service.start_workout(db, user.id, datetime.now(UTC))
+    template_id = body.template_id if body is not None else None
+    detail = service.start_workout(db, user.id, datetime.now(UTC), template_id)
     return ok(WorkoutResponse.from_detail(detail))
 
 
+@router.get("")
+def list_history(
+    query: Annotated[HistoryQuery, Query()], user: CurrentUser, db: DbSession
+) -> ApiResponse[Page[WorkoutSummaryResponse]]:
+    page = service.list_history(db, user.id, query.limit, query.offset)
+    return ok(
+        Page[WorkoutSummaryResponse](
+            items=[WorkoutSummaryResponse.from_summary(item) for item in page.items],
+            total=page.total,
+            limit=query.limit,
+            offset=query.offset,
+        )
+    )
+
+
 # The fixed paths are declared before "/{workout_id}" so they are not read as ids.
+
+
+@router.get("/records")
+def read_records(
+    exercise_id: uuid.UUID, user: CurrentUser, db: DbSession
+) -> ApiResponse[RecordsResponse]:
+    return ok(
+        RecordsResponse.model_validate(service.get_records(db, user.id, exercise_id))
+    )
 
 
 @router.get("/active")

@@ -96,6 +96,8 @@ def last_sets(client: TestClient, headers: Headers, exercise_id: str) -> Any:
     ("method", "path"),
     [
         ("POST", "/workouts"),
+        ("GET", "/workouts"),
+        ("GET", f"/workouts/records?exercise_id={UNKNOWN_ID}"),
         ("GET", "/workouts/active"),
         ("GET", f"/workouts/last-sets?exercise_id={UNKNOWN_ID}"),
         ("GET", f"/workouts/{UNKNOWN_ID}"),
@@ -696,3 +698,235 @@ def test_last_sets_requires_a_valid_exercise_id(
     assert missing.status_code == 422
     assert malformed.status_code == 422
     assert "exercise_id" in malformed.json()["error"]
+
+
+def finished_workout(
+    client: TestClient, headers: Headers, sets: list[tuple[str, float, int]]
+) -> dict[str, Any]:
+    """Log `(exercise_id, weight_kg, reps)` sets in a new workout and finish it."""
+    workout = start_workout(client, headers)
+    for exercise_id, weight_kg, reps in sets:
+        add_set(
+            client, headers, workout["id"], exercise_id, weight_kg=weight_kg, reps=reps
+        )
+    return finish_workout(client, headers, workout["id"])
+
+
+def history(client: TestClient, headers: Headers, **params: Any) -> dict[str, Any]:
+    response = client.get("/workouts", headers=headers, params=params)
+    assert response.status_code == 200, response.text
+    page: dict[str, Any] = response.json()["data"]
+    return page
+
+
+def records(client: TestClient, headers: Headers, exercise_id: str) -> dict[str, Any]:
+    response = client.get(
+        "/workouts/records", headers=headers, params={"exercise_id": exercise_id}
+    )
+    assert response.status_code == 200, response.text
+    found: dict[str, Any] = response.json()["data"]
+    return found
+
+
+def test_history_is_empty_before_any_workout_is_finished(
+    api_client: TestClient, auth_headers: Headers
+) -> None:
+    # Arrange
+    start_workout(api_client, auth_headers)
+
+    # Act
+    page = history(api_client, auth_headers)
+
+    # Assert
+    assert page == {"items": [], "total": 0, "limit": 20, "offset": 0}
+
+
+def test_history_summarises_finished_workouts_newest_first(
+    api_client: TestClient, auth_headers: Headers, squat_id: str, deadlift_id: str
+) -> None:
+    # Arrange
+    older = finished_workout(api_client, auth_headers, [(squat_id, 100, 5)])
+    newer = finished_workout(
+        api_client,
+        auth_headers,
+        [(deadlift_id, 140, 5), (squat_id, 100, 5), (deadlift_id, 150, 2)],
+    )
+
+    # Act
+    page = history(api_client, auth_headers)
+
+    # Assert
+    assert page["total"] == 2
+    assert [item["id"] for item in page["items"]] == [newer["id"], older["id"]]
+    assert page["items"][0] == {
+        "id": newer["id"],
+        "started_at": newer["started_at"],
+        "ended_at": newer["ended_at"],
+        "template_id": None,
+        "set_count": 3,
+        "exercise_names": ["Barbell Deadlift", "Barbell Squat"],
+        "volume_kg": "1500.0000",
+    }
+
+
+def test_history_includes_a_finished_workout_with_no_sets(
+    api_client: TestClient, auth_headers: Headers
+) -> None:
+    # Arrange
+    empty = finished_workout(api_client, auth_headers, [])
+
+    # Act
+    page = history(api_client, auth_headers)
+
+    # Assert
+    assert page["items"] == [
+        {
+            "id": empty["id"],
+            "started_at": empty["started_at"],
+            "ended_at": empty["ended_at"],
+            "template_id": None,
+            "set_count": 0,
+            "exercise_names": [],
+            "volume_kg": "0",
+        }
+    ]
+
+
+def test_history_shows_only_the_users_own_workouts(
+    api_client: TestClient,
+    auth_headers: Headers,
+    other_headers: Headers,
+    squat_id: str,
+) -> None:
+    # Arrange
+    finished_workout(api_client, other_headers, [(squat_id, 100, 5)])
+
+    # Act
+    page = history(api_client, auth_headers)
+
+    # Assert
+    assert page["items"] == []
+    assert page["total"] == 0
+
+
+def test_history_is_paged(
+    api_client: TestClient, auth_headers: Headers, squat_id: str
+) -> None:
+    # Arrange
+    workouts = [
+        finished_workout(api_client, auth_headers, [(squat_id, 100, 5)])
+        for _ in range(3)
+    ]
+
+    # Act
+    page = history(api_client, auth_headers, limit=1, offset=1)
+
+    # Assert
+    assert [item["id"] for item in page["items"]] == [workouts[1]["id"]]
+    assert (page["total"], page["limit"], page["offset"]) == (3, 1, 1)
+
+
+@pytest.mark.parametrize(
+    "params", [{"limit": 0}, {"limit": 51}, {"offset": -1}, {"offset": 10**30}]
+)
+def test_history_rejects_invalid_paging(
+    api_client: TestClient, auth_headers: Headers, params: dict[str, int]
+) -> None:
+    # Act
+    response = api_client.get("/workouts", headers=auth_headers, params=params)
+
+    # Assert
+    assert response.status_code == 422
+
+
+def test_records_are_null_for_an_exercise_never_logged(
+    api_client: TestClient, auth_headers: Headers, squat_id: str
+) -> None:
+    # Act
+    found = records(api_client, auth_headers, squat_id)
+
+    # Assert
+    assert found == {"heaviest": None, "best_estimated_1rm": None}
+
+
+def test_records_report_the_heaviest_set_and_the_best_estimated_one_rep_max(
+    api_client: TestClient, auth_headers: Headers, squat_id: str, deadlift_id: str
+) -> None:
+    # Arrange
+    volume_day = finished_workout(
+        api_client, auth_headers, [(squat_id, 100, 5), (squat_id, 95, 5)]
+    )
+    heavy_day = finished_workout(
+        api_client, auth_headers, [(squat_id, 110, 1), (deadlift_id, 180, 1)]
+    )
+
+    # Act
+    found = records(api_client, auth_headers, squat_id)
+
+    # Assert: 100 kg for 5 is an estimated 116.67 kg, more than the 110 kg single.
+    assert found == {
+        "heaviest": {
+            "workout_id": heavy_day["id"],
+            "achieved_at": heavy_day["started_at"],
+            "reps": 1,
+            "weight_kg": "110.0000",
+            "estimated_1rm_kg": "110.0000",
+        },
+        "best_estimated_1rm": {
+            "workout_id": volume_day["id"],
+            "achieved_at": volume_day["started_at"],
+            "reps": 5,
+            "weight_kg": "100.0000",
+            "estimated_1rm_kg": "116.6667",
+        },
+    }
+
+
+def test_records_keep_the_earliest_set_when_a_record_is_only_matched(
+    api_client: TestClient, auth_headers: Headers, squat_id: str
+) -> None:
+    # Arrange
+    first = finished_workout(api_client, auth_headers, [(squat_id, 100, 5)])
+    finished_workout(api_client, auth_headers, [(squat_id, 100, 5)])
+
+    # Act
+    found = records(api_client, auth_headers, squat_id)
+
+    # Assert
+    assert found["heaviest"]["workout_id"] == first["id"]
+    assert found["best_estimated_1rm"]["workout_id"] == first["id"]
+
+
+def test_high_rep_sets_count_as_heaviest_but_not_towards_the_estimate(
+    api_client: TestClient, auth_headers: Headers, squat_id: str
+) -> None:
+    # Arrange: an estimate from 20 reps would be an unreliable 100 kg.
+    finished_workout(api_client, auth_headers, [(squat_id, 60, 20), (squat_id, 50, 5)])
+
+    # Act
+    found = records(api_client, auth_headers, squat_id)
+
+    # Assert
+    assert found["heaviest"]["weight_kg"] == "60.0000"
+    assert found["heaviest"]["estimated_1rm_kg"] is None
+    assert found["best_estimated_1rm"]["weight_kg"] == "50.0000"
+    assert found["best_estimated_1rm"]["estimated_1rm_kg"] == "58.3333"
+
+
+def test_records_ignore_failed_sets_unfinished_workouts_and_other_users(
+    api_client: TestClient,
+    auth_headers: Headers,
+    other_headers: Headers,
+    squat_id: str,
+) -> None:
+    # Arrange
+    finished_workout(api_client, auth_headers, [(squat_id, 200, 0)])
+    finished_workout(api_client, other_headers, [(squat_id, 300, 1)])
+    in_progress = start_workout(api_client, auth_headers)
+    add_set(api_client, auth_headers, in_progress["id"], squat_id, weight_kg=250)
+
+    # Act
+    found = records(api_client, auth_headers, squat_id)
+
+    # Assert
+    assert found == {"heaviest": None, "best_estimated_1rm": None}
