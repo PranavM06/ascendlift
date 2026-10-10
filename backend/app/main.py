@@ -7,6 +7,7 @@ from app.core.rate_limit import register_rate_limiting
 from app.exercises.router import router as exercises_router
 from app.health.router import router as health_router
 from app.users.router import router as users_router
+from app.workouts.router import router as workouts_router
 
 
 def create_app() -> FastAPI:
@@ -20,6 +21,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(users_router)
     app.include_router(exercises_router)
+    app.include_router(workouts_router)
     return app
 
 

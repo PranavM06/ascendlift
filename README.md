@@ -67,6 +67,17 @@ Every response has the shape `{"success": bool, "data": ..., "error": string | n
 | `PATCH /users/me` | bearer | Body `{name?, timezone?, unit_preference?}`. Changes only the fields sent |
 | `GET /exercises` | bearer | The shared exercise library plus the user's own exercises, by name. Query `search?`, `muscle_group?`, `equipment?`, `limit?` (default 50, at most 100), `offset?`. Returns `{items, total, limit, offset}` |
 | `POST /exercises` | bearer | Body `{name, muscle_groups, equipment?}`. Adds an exercise only this user can see; 409 if they already have one with that name |
+| `POST /workouts` | bearer | Starts a workout; 409 if one is already in progress. Returns `{id, started_at, ended_at, template_id, sets}` |
+| `GET /workouts/active` | bearer | The workout in progress with its sets, or `null` |
+| `GET /workouts/last-sets?exercise_id=` | bearer | The exercise's sets from the latest finished workout that included it, as `{workout_id, started_at, sets}`, or `null` |
+| `GET /workouts/{id}` | bearer | One workout with its sets |
+| `POST /workouts/{id}/finish` | bearer | Ends the workout. Calling it again keeps the first end time |
+| `DELETE /workouts/{id}` | bearer | Deletes the workout and its sets |
+| `POST /workouts/{id}/sets` | bearer | Body `{exercise_id, reps, weight_kg, rpe?}`. Appends a set and returns `{id, exercise: {id, name}, position, reps, weight_kg, rpe}` |
+| `PATCH /workouts/{id}/sets/{set_id}` | bearer | Body `{reps?, weight_kg?, rpe?}`. Changes only the fields sent; `rpe: null` clears it |
+| `DELETE /workouts/{id}/sets/{set_id}` | bearer | Removes the set |
+
+Weights are always kilograms: at most four decimal places going in, and a string such as `"102.0583"` coming out so no precision is lost. RPE runs from 1 to 10 in half steps. Endpoints that write allow 120 requests a minute per client address.
 
 Sign-in works like this:
 

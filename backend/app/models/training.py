@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
@@ -91,6 +92,13 @@ class WorkoutSession(Base):
     __tablename__ = "workout_sessions"
     __table_args__ = (
         Index(None, "user_id", "started_at"),
+        # A user has at most one workout in progress.
+        Index(
+            "uq_workout_sessions_active_user",
+            "user_id",
+            unique=True,
+            postgresql_where=text("ended_at IS NULL"),
+        ),
         CheckConstraint(
             "ended_at IS NULL OR ended_at >= started_at", name="ends_after_start"
         ),

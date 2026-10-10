@@ -1,8 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
 from app.auth.deps import CurrentUser
+from app.core.rate_limit import WRITE_RATE_LIMIT, limiter
 from app.core.responses import ApiResponse, Page, ok
 from app.db.session import DbSession
 from app.exercises.schemas import ExerciseCreate, ExerciseQuery, ExerciseResponse
@@ -37,9 +38,12 @@ def list_visible_exercises(
     )
 
 
+# The rate limiter reads the client address from `request`, so the endpoint
+# must accept it even though it does not use it.
 @router.post("", status_code=CREATED)
+@limiter.limit(WRITE_RATE_LIMIT)
 def create_exercise(
-    body: ExerciseCreate, user: CurrentUser, db: DbSession
+    request: Request, body: ExerciseCreate, user: CurrentUser, db: DbSession
 ) -> ApiResponse[ExerciseResponse]:
     exercise = create_custom_exercise(
         db, user.id, body.name, body.muscle_groups, body.equipment

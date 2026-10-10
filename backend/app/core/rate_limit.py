@@ -7,6 +7,8 @@ from slowapi.util import get_remote_address
 from app.core.errors import error_response
 
 AUTH_RATE_LIMIT = "10/minute"
+# Room for logging sets quickly, while stopping a runaway client.
+WRITE_RATE_LIMIT = "120/minute"
 TOO_MANY_REQUESTS = 429
 RATE_LIMITED_MESSAGE = "Too many requests. Try again shortly."
 
