@@ -7,6 +7,7 @@ import { Button } from '@/components/Button';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import {
   EXERCISES_QUERY_KEY,
+  MAX_EXERCISE_NAME_LENGTH,
   readableLabel,
   searchExercises,
   type Exercise,
@@ -59,7 +60,8 @@ export default function ExercisePickerScreen() {
 
   function handleCreate() {
     // Replaces the picker, so saving the new exercise returns to the workout.
-    router.replace({ pathname: '/new-exercise', params: { name: searchText.trim() } });
+    const name = searchText.trim().slice(0, MAX_EXERCISE_NAME_LENGTH);
+    router.replace({ pathname: '/new-exercise', params: { name } });
   }
 
   return (

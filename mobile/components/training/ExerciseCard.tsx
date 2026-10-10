@@ -35,7 +35,12 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
   const [repsText, setRepsText] = useState<string | null>(null);
   const [rpeText, setRpeText] = useState('');
   const [entryError, setEntryError] = useState<string | null>(null);
-  const [editingSetId, setEditingSetId] = useState<string | null>(null);
+  const [requestedEditId, setRequestedEditId] = useState<string | null>(null);
+  // A set can vanish while it is being edited, such as when it is deleted from
+  // another device. Then nothing is being edited any more.
+  const editingSetId = group.sets.some((set) => set.id === requestedEditId)
+    ? requestedEditId
+    : null;
 
   const lastTimeSets = lastSets.data?.sets ?? NO_SETS;
   const suggestion = suggestNextSet(group.sets, lastTimeSets);
@@ -53,13 +58,11 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
       return;
     }
     setEntryError(null);
+    // The field shows two decimals, so a suggested weight that was not retyped
+    // is sent as stored rather than converted back from that rounded text.
+    const weightKg = weightText === null && suggestion ? suggestion.weightKg : parsed.weightKg;
     logSet.mutate(
-      {
-        exerciseId: group.exercise.id,
-        reps: parsed.reps,
-        weightKg: parsed.weightKg,
-        rpe: parsed.rpe,
-      },
+      { exerciseId: group.exercise.id, reps: parsed.reps, weightKg, rpe: parsed.rpe },
       {
         onSuccess: () => {
           // Back to "not typed in", so the form now suggests the set just logged.
@@ -89,8 +92,8 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
           number={index + 1}
           unit={unit}
           isEditing={editingSetId === set.id}
-          onStartEdit={() => setEditingSetId(set.id)}
-          onStopEdit={() => setEditingSetId(null)}
+          onStartEdit={() => setRequestedEditId(set.id)}
+          onStopEdit={() => setRequestedEditId(null)}
         />
       ))}
 

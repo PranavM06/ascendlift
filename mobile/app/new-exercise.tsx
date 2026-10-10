@@ -9,6 +9,7 @@ import {
   createExercise,
   EQUIPMENT,
   EXERCISES_QUERY_KEY,
+  MAX_EXERCISE_NAME_LENGTH,
   MUSCLE_GROUPS,
   readableLabel,
 } from '@/src/api/exercises';
@@ -16,7 +17,6 @@ import { userMessage } from '@/src/api/http';
 import { pickExercise } from '@/src/training/pickedExercises';
 import { useActiveWorkout } from '@/src/training/useWorkout';
 
-const MAX_NAME_LENGTH = 100;
 const PLACEHOLDER_COLOR = '#888';
 const BRAND_BLUE = '#2f95dc';
 
@@ -89,7 +89,7 @@ export default function NewExerciseScreen() {
         style={[styles.name, { color: textColor }]}
         value={name}
         onChangeText={setName}
-        maxLength={MAX_NAME_LENGTH}
+        maxLength={MAX_EXERCISE_NAME_LENGTH}
         placeholder="e.g. Sled Drag"
         placeholderTextColor={PLACEHOLDER_COLOR}
         autoCapitalize="words"

@@ -29,7 +29,8 @@ const DELETE_HIT_SLOP = 8;
 /** The form shown in place of a set while it is being edited. */
 function SetEditor({ workoutId, set, unit, onStopEdit }: SetEditorProps) {
   const updateSet = useUpdateSet(workoutId);
-  const [weightText, setWeightText] = useState(String(toEntryWeight(set.weightKg, unit)));
+  const initialWeightText = String(toEntryWeight(set.weightKg, unit));
+  const [weightText, setWeightText] = useState(initialWeightText);
   const [repsText, setRepsText] = useState(String(set.reps));
   const [rpeText, setRpeText] = useState(set.rpe === null ? '' : String(set.rpe));
   const [entryError, setEntryError] = useState<string | null>(null);
@@ -45,11 +46,11 @@ function SetEditor({ workoutId, set, unit, onStopEdit }: SetEditorProps) {
       return;
     }
     setEntryError(null);
+    // The field shows two decimals, so a weight that was not retyped is sent
+    // as stored rather than converted back from that rounded text.
+    const weightKg = weightText === initialWeightText ? set.weightKg : parsed.weightKg;
     updateSet.mutate(
-      {
-        setId: set.id,
-        changes: { reps: parsed.reps, weightKg: parsed.weightKg, rpe: parsed.rpe },
-      },
+      { setId: set.id, changes: { reps: parsed.reps, weightKg, rpe: parsed.rpe } },
       { onSuccess: onStopEdit }
     );
   }

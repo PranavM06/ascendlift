@@ -161,6 +161,59 @@ test('edits a logged set in place', async () => {
   expect(await screen.findByText('Log set')).toBeTruthy();
 });
 
+test('keeps the stored weight exact when an edit leaves the weight alone', async () => {
+  // Arrange: 100 kg shows as 220.46 lb, which would convert back to 99.999 kg.
+  const set100Kg = { ...SET_225_LB, weightKg: 100 };
+  updateSetMock.mockResolvedValue({ ...set100Kg, reps: 6 });
+  await renderCard([set100Kg]);
+
+  // Act
+  await fireEvent.press(screen.getByLabelText('Edit set 1 of Barbell Squat'));
+  await fireEvent.changeText(screen.getByLabelText('Reps'), '6');
+  await fireEvent.press(screen.getByText('Save'));
+
+  // Assert
+  expect(updateSetMock).toHaveBeenCalledWith('workout-1', 'set-1', {
+    reps: 6,
+    weightKg: 100,
+    rpe: null,
+  });
+});
+
+test('keeps the suggested weight exact when it is logged without being edited', async () => {
+  // Arrange
+  const set100Kg = { ...SET_225_LB, weightKg: 100 };
+  logSetMock.mockResolvedValue({ ...set100Kg, id: 'set-2' });
+  await renderCard([set100Kg]);
+
+  // Act
+  await fireEvent.press(screen.getByText('Log set'));
+
+  // Assert
+  expect(logSetMock.mock.calls[0][1]).toMatchObject({ weightKg: 100 });
+});
+
+test('brings the new-set form back when the set being edited disappears', async () => {
+  // Arrange
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  const cardWith = (sets: WorkoutSet[]) => (
+    <QueryClientProvider client={queryClient}>
+      <ExerciseCard workoutId="workout-1" group={{ exercise: SQUAT, sets }} unit="lbs" />
+    </QueryClientProvider>
+  );
+  const otherSet = { ...SET_225_LB, id: 'set-2', position: 2 };
+  const view = await render(cardWith([SET_225_LB, otherSet]));
+  await fireEvent.press(screen.getByLabelText('Edit set 1 of Barbell Squat'));
+
+  // Act: the set is removed elsewhere, such as from another device.
+  await view.rerender(cardWith([otherSet]));
+
+  // Assert
+  expect(screen.getByText('Log set')).toBeTruthy();
+});
+
 test('cancelling an edit changes nothing', async () => {
   // Arrange
   await renderCard([SET_225_LB]);

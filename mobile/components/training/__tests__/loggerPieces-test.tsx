@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { Vibration } from 'react-native';
 
 import NewExerciseScreen from '@/app/new-exercise';
 import { RestTimer } from '@/components/training/RestTimer';
@@ -72,8 +73,9 @@ describe('RestTimer', () => {
     expect(screen.queryByText(/Rest/)).toBeNull();
   });
 
-  test('ends by itself once the time is up', async () => {
+  test('clears a rest that ended while the screen was closed, without vibrating', async () => {
     // Arrange: a rest that finished a moment ago.
+    const vibrate = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
     startRest(Date.now() - 5000, 1);
 
     // Act
@@ -81,6 +83,27 @@ describe('RestTimer', () => {
 
     // Assert
     await waitFor(() => expect(useRestTimer.getState().endsAt).toBeNull());
+    expect(vibrate).not.toHaveBeenCalled();
+    vibrate.mockRestore();
+  });
+
+  test('vibrates when the rest runs out on screen', async () => {
+    // Arrange
+    jest.useFakeTimers();
+    const vibrate = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => undefined);
+    startRest(Date.now(), 2);
+    await render(<RestTimer />);
+
+    // Act
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+
+    // Assert
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(useRestTimer.getState().endsAt).toBeNull();
+    vibrate.mockRestore();
+    jest.useRealTimers();
   });
 });
 

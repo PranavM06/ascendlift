@@ -62,6 +62,8 @@ export const EQUIPMENT = [
 ] as const;
 
 const PAGE_SIZE = 50;
+/** The longest exercise name the backend accepts. */
+export const MAX_EXERCISE_NAME_LENGTH = 100;
 
 /** "lower_back" is shown as "lower back". */
 export function readableLabel(value: string): string {

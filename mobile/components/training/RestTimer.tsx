@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Vibration } from 'react-native';
 
 import { Button } from '@/components/Button';
@@ -16,13 +16,19 @@ import { formatDuration } from '@/src/training/workoutModel';
 function RestCountdown({ endsAt }: { endsAt: number }) {
   const now = useNow();
   const secondsLeft = remainingSeconds(endsAt, now.getTime());
+  // A rest that ran out while this screen was closed is cleared quietly; the
+  // moment to signal it has passed.
+  const [wasOverOnOpen] = useState(() => endsAt <= Date.now());
 
   useEffect(() => {
-    if (secondsLeft === 0) {
-      Vibration.vibrate();
-      stopRest();
+    if (secondsLeft > 0) {
+      return;
     }
-  }, [secondsLeft]);
+    if (!wasOverOnOpen) {
+      Vibration.vibrate();
+    }
+    stopRest();
+  }, [secondsLeft, wasOverOnOpen]);
 
   return (
     <View style={styles.bar} accessibilityRole="timer">
