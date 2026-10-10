@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import type { ReactElement } from 'react';
 
@@ -42,6 +42,8 @@ const useLocalSearchParamsMock = jest.mocked(useLocalSearchParams);
 const routerPushMock = jest.mocked(router.push);
 const routerDismissAllMock = jest.mocked(router.dismissAll);
 
+// Longer than the search screen waits after the last keystroke.
+const PAST_DEBOUNCE_MS = 500;
 const TODAY = toDateKey(new Date());
 const YESTERDAY = shiftDateKey(TODAY, -1);
 
@@ -260,8 +262,9 @@ describe('Food search', () => {
     // Act
     await fireEvent.changeText(screen.getByLabelText('Search foods'), 'c');
 
+    await act(() => new Promise((resolve) => setTimeout(resolve, PAST_DEBOUNCE_MS)));
+
     // Assert: the recent foods stay up.
-    await expect(screen.findByText('No foods match “c”.')).rejects.toThrow();
     expect(screen.getByText('Recent')).toBeTruthy();
     expect(searchFoodsMock).not.toHaveBeenCalled();
   });
@@ -359,6 +362,36 @@ describe('Food entry', () => {
     expect(screen.getByText('Servings go from 0.01 to 100.')).toBeTruthy();
     expect(logFoodMock).not.toHaveBeenCalled();
     expect(routerDismissAllMock).not.toHaveBeenCalled();
+  });
+
+  test('logs once even when the button is tapped again as the screen closes', async () => {
+    // Arrange
+    logFoodMock.mockResolvedValue(CHICKEN_ENTRY);
+    startNewEntry(CHICKEN, 'dinner', TODAY);
+    await renderScreen(<FoodEntryScreen />);
+
+    // Act
+    await fireEvent.press(screen.getByText('Log food'));
+    await waitFor(() => expect(routerDismissAllMock).toHaveBeenCalledTimes(1));
+    await fireEvent.press(screen.getByText('Log food'));
+
+    // Assert
+    expect(logFoodMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('drops the servings message once the field is corrected', async () => {
+    // Arrange
+    startNewEntry(CHICKEN, 'dinner', TODAY);
+    await renderScreen(<FoodEntryScreen />);
+    await fireEvent.changeText(screen.getByLabelText('Servings'), '0');
+    await fireEvent.press(screen.getByText('Log food'));
+
+    // Act: "1." is not a number yet, so the amount keeps its last value.
+    await fireEvent.changeText(screen.getByLabelText('Servings'), '1.');
+
+    // Assert
+    expect(screen.queryByText('Servings go from 0.01 to 100.')).toBeNull();
+    expect(screen.getByLabelText('Amount in g').props.value).toBe('0');
   });
 
   test('saves changed servings and meal of an entry being edited', async () => {

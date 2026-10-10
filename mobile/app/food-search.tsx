@@ -36,7 +36,9 @@ export default function FoodSearchScreen() {
   // Until there is something to search for, offer what was logged lately.
   const shown = isSearching ? results : recent;
   const foods = shown.data ?? [];
-  const isSettled = shown.isSuccess && !(isSearching && results.isPlaceholderData);
+  // While a new search loads, the list still holds the previous one's foods.
+  const isLoadingNext = isSearching && results.isPlaceholderData;
+  const isSettled = shown.isSuccess && !isLoadingNext;
 
   function handlePick(food: Food) {
     startNewEntry(food, meal, entryDate);
@@ -58,7 +60,7 @@ export default function FoodSearchScreen() {
         accessibilityLabel="Search foods"
       />
 
-      {shown.isPending ? <ActivityIndicator style={styles.status} /> : null}
+      {shown.isPending || isLoadingNext ? <ActivityIndicator style={styles.status} /> : null}
       {shown.isError ? (
         <Text style={[styles.status, styles.error]} accessibilityRole="alert">
           {userMessage(shown.error, "Couldn't load foods.")}

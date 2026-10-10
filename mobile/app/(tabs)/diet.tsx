@@ -40,12 +40,20 @@ function DayStep({ label, symbol, onPress, disabled = false }: DayStepProps) {
 
 export default function DietScreen() {
   const today = toDateKey(new Date());
-  const [entryDate, setEntryDate] = useState(today);
+  // Null follows today, so a tab left open past midnight moves on to the new day.
+  const [pastDate, setPastDate] = useState<string | null>(null);
+  const entryDate = pastDate ?? today;
   const day = useDay(entryDate);
-  const isToday = entryDate === today;
+  const isToday = pastDate === null;
+
+  function showDate(dateKey: string) {
+    setPastDate(dateKey >= today ? null : dateKey);
+  }
 
   function addFood(meal: Meal) {
-    router.push({ pathname: '/food-search', params: { meal, date: entryDate } });
+    // Read the clock again: this screen may have been drawn before midnight.
+    const date = pastDate ?? toDateKey(new Date());
+    router.push({ pathname: '/food-search', params: { meal, date } });
   }
 
   return (
@@ -54,17 +62,17 @@ export default function DietScreen() {
         <DayStep
           label="Previous day"
           symbol="‹"
-          onPress={() => setEntryDate(shiftDateKey(entryDate, -1))}
+          onPress={() => showDate(shiftDateKey(entryDate, -1))}
         />
         <Text style={styles.day}>{describeDay(entryDate, today)}</Text>
         <DayStep
           label="Next day"
           symbol="›"
-          onPress={() => setEntryDate(shiftDateKey(entryDate, 1))}
+          onPress={() => showDate(shiftDateKey(entryDate, 1))}
           disabled={isToday}
         />
       </View>
-      {isToday ? null : <Button label="Back to today" onPress={() => setEntryDate(today)} />}
+      {isToday ? null : <Button label="Back to today" onPress={() => setPastDate(null)} />}
 
       {day.isPending ? <ActivityIndicator style={styles.status} /> : null}
       {day.isError ? (

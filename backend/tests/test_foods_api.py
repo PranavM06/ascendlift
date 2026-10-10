@@ -122,6 +122,22 @@ def test_a_repeated_search_is_answered_without_asking_usda_again(
     assert food_source.queries == ["greek yogurt"]
 
 
+def test_a_search_that_grows_when_lower_cased_still_fits_the_cache(
+    api_client: TestClient, auth_headers: dict[str, str], food_source: FakeFoodSource
+) -> None:
+    # Arrange: each "İ" lower-cases to two characters.
+    term = "İ" * 100
+
+    # Act
+    foods = search(api_client, auth_headers, term)
+    search(api_client, auth_headers, term)
+
+    # Assert
+    assert len(foods) == 2
+    assert len(food_source.queries) == 1
+    assert len(food_source.queries[0]) == 100
+
+
 def test_a_search_with_no_matches_is_remembered_too(
     api_client: TestClient, auth_headers: dict[str, str], food_source: FakeFoodSource
 ) -> None:

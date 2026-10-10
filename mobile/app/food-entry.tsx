@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput } from 'react-native';
 
 import { Button } from '@/components/Button';
@@ -24,11 +24,6 @@ import { useDeleteFoodLogEntry, useLogFood, useUpdateFoodLogEntry } from '@/src/
 const PLACEHOLDER_COLOR = '#888';
 const DEFAULT_SERVINGS = 1;
 
-/** Closes the entry screen, and the food search under it, back to the Diet tab. */
-function returnToDiet() {
-  router.dismissAll();
-}
-
 function EntryForm({ draft }: { draft: EntryDraft }) {
   const textColor = useThemeColor({}, 'text');
   const { food, entry } = draft;
@@ -43,29 +38,46 @@ function EntryForm({ draft }: { draft: EntryDraft }) {
 
   const parsed = parseServings(servingsText);
   const preview = parsed.ok ? scaleMacros(food, parsed.servings) : null;
-  const isBusy = log.isPending || update.isPending || remove.isPending;
+  // Set the moment a request succeeds, ahead of the next render, so a second
+  // tap while the screen closes cannot log the food twice.
+  const isClosing = useRef(false);
+  const isBusy = [log, update, remove].some((request) => request.isPending || request.isSuccess);
   const requestError = log.error ?? update.error ?? remove.error;
   const errorMessage =
     formError ?? (requestError ? userMessage(requestError, "Couldn't save. Try again.") : null);
   const inputStyle = [styles.input, { color: textColor }];
 
   // The two fields say the same thing two ways, so typing in one rewrites the other.
+  // Text that is not a number yet, such as "1.", leaves the other field alone.
   function handleChangeServings(text: string) {
+    setFormError(null);
     setServingsText(text);
-    setAmountText(amountTextFor(food, text));
+    setAmountText(amountTextFor(food, text) || amountText);
   }
 
   function handleChangeAmount(text: string) {
+    setFormError(null);
     setAmountText(text);
-    setServingsText(servingsTextFor(food, text));
+    setServingsText(servingsTextFor(food, text) || servingsText);
+  }
+
+  /** Closes this screen, and the food search under it, back to the Diet tab. */
+  function returnToDiet() {
+    isClosing.current = true;
+    router.dismissAll();
   }
 
   function handleSave() {
+    if (isClosing.current) {
+      return;
+    }
     if (!parsed.ok) {
       setFormError(parsed.message);
       return;
     }
     setFormError(null);
+    // Drops the message of a delete that failed before this attempt.
+    remove.reset();
     const { servings } = parsed;
     if (entry === null) {
       log.mutate(
@@ -78,6 +90,15 @@ function EntryForm({ draft }: { draft: EntryDraft }) {
         { onSuccess: returnToDiet }
       );
     }
+  }
+
+  function handleDelete(entryId: string) {
+    if (isClosing.current) {
+      return;
+    }
+    setFormError(null);
+    update.reset();
+    remove.mutate(entryId, { onSuccess: returnToDiet });
   }
 
   return (
@@ -148,7 +169,7 @@ function EntryForm({ draft }: { draft: EntryDraft }) {
         <Button
           label="Delete entry"
           variant="danger"
-          onPress={() => remove.mutate(entry.id, { onSuccess: returnToDiet })}
+          onPress={() => handleDelete(entry.id)}
           disabled={isBusy}
         />
       ) : null}

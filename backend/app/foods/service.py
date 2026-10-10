@@ -15,6 +15,8 @@ SEARCH_UNAVAILABLE_MESSAGE = "Food search is unavailable right now. Try again sh
 # USDA's data changes a few times a year, so a month-old answer is still good.
 SEARCH_CACHE_TTL = timedelta(days=30)
 MAX_RECENT_FOODS = 20
+# What the food_searches.query column holds.
+MAX_QUERY_LENGTH = 100
 # What a repeated search refreshes on a food that is already stored.
 REFRESHED_COLUMNS = (
     "name",
@@ -30,7 +32,8 @@ REFRESHED_COLUMNS = (
 
 def normalize_query(search: str) -> str:
     """Lower case with single spaces, so near-identical searches share a cache row."""
-    return " ".join(search.lower().split())
+    # Cut after lower-casing, which makes a few letters such as "İ" longer.
+    return " ".join(search.lower().split())[:MAX_QUERY_LENGTH].rstrip()
 
 
 def _foods_in_order(db: Session, food_ids: list[uuid.UUID]) -> list[Food]:
