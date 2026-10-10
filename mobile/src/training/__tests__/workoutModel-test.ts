@@ -1,5 +1,6 @@
 import type { WorkoutSet } from '@/src/api/workouts';
 import {
+  describePlan,
   describeRecords,
   describeSet,
   formatDuration,
@@ -160,6 +161,33 @@ describe('describeRecords', () => {
 
   test('is null before the exercise has any record', () => {
     expect(describeRecords({ heaviest: null, bestEstimated1rm: null }, 'kg')).toBeNull();
+  });
+});
+
+describe('describePlan', () => {
+  const plan = {
+    id: 'item-1',
+    exercise: SQUAT,
+    position: 1,
+    targetSets: 3,
+    repMin: 5,
+    repMax: 8,
+    targetWeightKg: null,
+    targetRpe: null,
+  };
+
+  test('shows the sets and the rep range', () => {
+    expect(describePlan(plan, 'kg')).toBe('Plan: 3 × 5–8');
+  });
+
+  test('shows a single number when the range is one value', () => {
+    expect(describePlan({ ...plan, repMin: 5, repMax: 5 }, 'kg')).toBe('Plan: 3 × 5');
+  });
+
+  test('adds the target weight and RPE when they are set', () => {
+    expect(describePlan({ ...plan, targetWeightKg: 100, targetRpe: 8 }, 'kg')).toBe(
+      'Plan: 3 × 5–8 at 100 kg @ 8'
+    );
   });
 });
 

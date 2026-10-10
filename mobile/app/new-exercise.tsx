@@ -14,7 +14,7 @@ import {
   readableLabel,
 } from '@/src/api/exercises';
 import { userMessage } from '@/src/api/http';
-import { pickExercise } from '@/src/training/pickedExercises';
+import { deliverPick, toPickTarget } from '@/src/training/pickedExercises';
 import { useActiveWorkout } from '@/src/training/useWorkout';
 
 const PLACEHOLDER_COLOR = '#888';
@@ -36,7 +36,7 @@ function Chip({ label, isSelected, onPress }: ChipProps) {
 
 export default function NewExerciseScreen() {
   const textColor = useThemeColor({}, 'text');
-  const params = useLocalSearchParams<{ name?: string }>();
+  const params = useLocalSearchParams<{ name?: string; target?: string }>();
   const queryClient = useQueryClient();
   const activeWorkout = useActiveWorkout();
   const [name, setName] = useState(typeof params.name === 'string' ? params.name : '');
@@ -49,9 +49,8 @@ export default function NewExerciseScreen() {
     mutationFn: createExercise,
     onSuccess: (exercise) => {
       void queryClient.invalidateQueries({ queryKey: EXERCISES_QUERY_KEY });
-      if (workoutId !== undefined) {
-        pickExercise(workoutId, { id: exercise.id, name: exercise.name });
-      }
+      const target = toPickTarget(params.target);
+      deliverPick(target, { id: exercise.id, name: exercise.name }, workoutId);
       router.back();
     },
   });

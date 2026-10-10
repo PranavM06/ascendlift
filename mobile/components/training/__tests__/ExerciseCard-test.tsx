@@ -80,6 +80,41 @@ test('pre-fills the form from last time, in the user’s unit', async () => {
   expect(screen.getByLabelText('Reps').props.value).toBe('5');
 });
 
+test('shows the template’s plan and starts the form from it', async () => {
+  // Arrange
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  const plan = {
+    id: 'item-1',
+    exercise: SQUAT,
+    position: 1,
+    targetSets: 3,
+    repMin: 5,
+    repMax: 8,
+    targetWeightKg: 102.0583,
+    targetRpe: null,
+  };
+
+  // Act
+  await render(
+    <QueryClientProvider client={queryClient}>
+      <ExerciseCard
+        workoutId="workout-1"
+        group={{ exercise: SQUAT, sets: [] }}
+        unit="lbs"
+        plan={plan}
+      />
+    </QueryClientProvider>
+  );
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+
+  // Assert
+  expect(screen.getByText('Plan: 3 × 5–8 at 225 lb')).toBeTruthy();
+  expect(screen.getByLabelText('Weight in lb').props.value).toBe('225');
+  expect(screen.getByLabelText('Reps').props.value).toBe('5');
+});
+
 test('shows the user’s records for the exercise', async () => {
   // Arrange
   const record = {
@@ -227,6 +262,7 @@ test('brings the new-set form back when the set being edited disappears', async 
   );
   const otherSet = { ...SET_225_LB, id: 'set-2', position: 2 };
   const view = await render(cardWith([SET_225_LB, otherSet]));
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
   await fireEvent.press(screen.getByLabelText('Edit set 1 of Barbell Squat'));
 
   // Act: the set is removed elsewhere, such as from another device.

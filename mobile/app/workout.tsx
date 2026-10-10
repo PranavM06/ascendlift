@@ -13,12 +13,16 @@ import { Text, View } from '@/components/Themed';
 import { ExerciseCard } from '@/components/training/ExerciseCard';
 import { RestTimer } from '@/components/training/RestTimer';
 import { userMessage } from '@/src/api/http';
+import type { TemplateExercise } from '@/src/api/templates';
 import type { Workout } from '@/src/api/workouts';
 import { usePickedExercisesFor } from '@/src/training/pickedExercises';
 import { useNow } from '@/src/training/useNow';
+import { useTemplate } from '@/src/training/useTemplates';
 import { useActiveWorkout, useDiscardWorkout, useFinishWorkout } from '@/src/training/useWorkout';
 import { formatElapsed, groupSetsByExercise } from '@/src/training/workoutModel';
 import { useUnitPreference } from '@/src/units/useUnitPreference';
+
+const NO_PLANS: TemplateExercise[] = [];
 
 function ElapsedTime({ startedAt }: { startedAt: string }) {
   const now = useNow();
@@ -31,7 +35,12 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
   const finish = useFinishWorkout();
   const discard = useDiscardWorkout();
 
-  const groups = groupSetsByExercise(workout.sets, pickedExercises);
+  // A workout started from a template lists the template's exercises up front,
+  // each with its plan. If the template cannot be loaded the workout still works.
+  const template = useTemplate(workout.templateId);
+  const plans = template.data?.exercises ?? NO_PLANS;
+  const plannedExercises = plans.map((plan) => plan.exercise);
+  const groups = groupSetsByExercise(workout.sets, [...plannedExercises, ...pickedExercises]);
   const isClosing = finish.isPending || discard.isPending;
   const closeError = finish.error ?? discard.error;
 
@@ -74,6 +83,7 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
             workoutId={workout.id}
             group={group}
             unit={unit}
+            plan={plans.find((plan) => plan.exercise.id === group.exercise.id)}
           />
         ))}
 

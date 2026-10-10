@@ -1,3 +1,4 @@
+import type { TemplateExercise } from '@/src/api/templates';
 import type { UnitPreference } from '@/src/api/users';
 import type { ExerciseRecords, ExerciseRef, WorkoutSet } from '@/src/api/workouts';
 import { formatWeight, KG_PER_LB, parseWeight, toKg, UNIT_LABEL } from '@/src/units/weight';
@@ -85,6 +86,14 @@ export function describeRecords(records: ExerciseRecords, unit: UnitPreference):
   const best = `Best: ${formatWeight(heaviest.weightKg, unit)} × ${heaviest.reps}`;
   const estimate = bestEstimated1rm?.estimated1rmKg ?? null;
   return estimate === null ? best : `${best} · est. 1RM ${formatWeight(estimate, unit)}`;
+}
+
+/** What a template asks for on one exercise, such as "Plan: 3 × 5–8". */
+export function describePlan(plan: TemplateExercise, unit: UnitPreference): string {
+  const reps = plan.repMin === plan.repMax ? `${plan.repMin}` : `${plan.repMin}–${plan.repMax}`;
+  const weight = plan.targetWeightKg === null ? '' : ` at ${formatWeight(plan.targetWeightKg, unit)}`;
+  const rpe = plan.targetRpe === null ? '' : ` @ ${plan.targetRpe}`;
+  return `Plan: ${plan.targetSets} × ${reps}${weight}${rpe}`;
 }
 
 /** Reads the three fields of the set form, or says what is wrong with them. */

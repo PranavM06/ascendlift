@@ -79,7 +79,7 @@ export type NewSet = {
 export type SetChanges = Omit<NewSet, 'exerciseId'>;
 
 /** The backend sends decimals as strings such as "102.0583". */
-function toNumber(value: unknown): number {
+export function toNumber(value: unknown): number {
   const parsed = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   if (typeof parsed !== 'number' || !Number.isFinite(parsed)) {
     throw unexpectedResponse();
@@ -87,7 +87,7 @@ function toNumber(value: unknown): number {
   return parsed;
 }
 
-function toExerciseRef(data: unknown): ExerciseRef {
+export function toExerciseRef(data: unknown): ExerciseRef {
   if (!isRecord(data) || typeof data.id !== 'string' || typeof data.name !== 'string') {
     throw unexpectedResponse();
   }

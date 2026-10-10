@@ -6,11 +6,13 @@ import { Text, View } from '@/components/Themed';
 import { SetFields } from '@/components/training/SetFields';
 import { SetRow } from '@/components/training/SetRow';
 import { userMessage } from '@/src/api/http';
+import type { TemplateExercise } from '@/src/api/templates';
 import type { UnitPreference } from '@/src/api/users';
 import type { WorkoutSet } from '@/src/api/workouts';
 import { startRest } from '@/src/training/restTimer';
 import { useLastSets, useLogSet, useRecords } from '@/src/training/useWorkout';
 import {
+  describePlan,
   describeRecords,
   describeSet,
   parseSetEntry,
@@ -23,12 +25,14 @@ type ExerciseCardProps = {
   workoutId: string;
   group: ExerciseGroup;
   unit: UnitPreference;
+  /** What the workout's template asks for on this exercise, if anything. */
+  plan?: TemplateExercise;
 };
 
 const NO_SETS: WorkoutSet[] = [];
 
 /** One exercise in the workout: its logged sets and the form for the next one. */
-export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
+export function ExerciseCard({ workoutId, group, unit, plan }: ExerciseCardProps) {
   const lastSets = useLastSets(group.exercise.id);
   const records = useRecords(group.exercise.id);
   const logSet = useLogSet(workoutId);
@@ -46,10 +50,17 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
 
   const recordsLine = records.data ? describeRecords(records.data, unit) : null;
   const lastTimeSets = lastSets.data?.sets ?? NO_SETS;
-  const suggestion = suggestNextSet(group.sets, lastTimeSets);
+  // With no history to go on, a template's plan is the starting point: its
+  // target weight if it has one, and the low end of its rep range.
+  const plannedSet =
+    plan && plan.targetWeightKg !== null
+      ? { weightKg: plan.targetWeightKg, reps: plan.repMin }
+      : null;
+  const suggestion = suggestNextSet(group.sets, lastTimeSets) ?? plannedSet;
   const shownWeight =
     weightText ?? (suggestion ? String(toEntryWeight(suggestion.weightKg, unit)) : '');
-  const shownReps = repsText ?? (suggestion ? String(suggestion.reps) : '');
+  const suggestedReps = suggestion?.reps ?? plan?.repMin;
+  const shownReps = repsText ?? (suggestedReps === undefined ? '' : String(suggestedReps));
 
   const errorMessage =
     entryError ?? (logSet.error ? userMessage(logSet.error, "Couldn't save. Try again.") : null);
@@ -81,6 +92,7 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
   return (
     <View style={styles.card}>
       <Text style={styles.name}>{group.exercise.name}</Text>
+      {plan ? <Text style={styles.lastTime}>{describePlan(plan, unit)}</Text> : null}
       {recordsLine ? <Text style={styles.lastTime}>{recordsLine}</Text> : null}
       {lastTimeSets.length > 0 ? (
         <Text style={styles.lastTime}>

@@ -89,6 +89,10 @@ export function jsonPatch(body: unknown): JsonRequest<'PATCH'> {
   return jsonRequest('PATCH', body);
 }
 
+export function jsonPut(body: unknown): JsonRequest<'PUT'> {
+  return jsonRequest('PUT', body);
+}
+
 export function unexpectedResponse(): ApiError {
   return new ApiError(NETWORK_ERROR_STATUS, UNEXPECTED_RESPONSE_MESSAGE);
 }
