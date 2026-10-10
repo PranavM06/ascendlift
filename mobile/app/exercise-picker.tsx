@@ -76,7 +76,7 @@ export default function ExercisePickerScreen() {
           {userMessage(results.error, "Couldn't load exercises.")}
         </Text>
       ) : null}
-      {results.isSuccess && exercises.length === 0 ? (
+      {results.isSuccess && !results.isPlaceholderData && exercises.length === 0 ? (
         <Text style={styles.status}>No exercises match “{search}”.</Text>
       ) : null}
 

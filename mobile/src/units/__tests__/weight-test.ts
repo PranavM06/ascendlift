@@ -1,4 +1,10 @@
-import { formatWeight, parseWeight, toDisplayWeight, toKg } from '@/src/units/weight';
+import {
+  formatWeight,
+  parseWeight,
+  toDisplayWeight,
+  toEntryWeight,
+  toKg,
+} from '@/src/units/weight';
 
 describe('toKg', () => {
   test('converts pounds to kilograms at four decimal places', () => {
@@ -26,6 +32,18 @@ describe('toDisplayWeight', () => {
     // 225 lb is 102.06 kg.
     expect(toDisplayWeight(102.0583, 'kg')).toBe(102.5);
     expect(toDisplayWeight(101.25, 'kg')).toBe(101.25);
+  });
+});
+
+describe('toEntryWeight', () => {
+  test('gives back exactly what was typed, even off the plate steps', () => {
+    expect(toEntryWeight(toKg(131, 'lbs'), 'lbs')).toBe(131);
+    expect(toEntryWeight(toKg(12, 'lbs'), 'lbs')).toBe(12);
+    expect(toEntryWeight(101.5, 'kg')).toBe(101.5);
+  });
+
+  test('converts to the other unit at two decimal places', () => {
+    expect(toEntryWeight(100, 'lbs')).toBe(220.46);
   });
 });
 

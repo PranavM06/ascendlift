@@ -13,7 +13,7 @@ import {
   suggestNextSet,
   type ExerciseGroup,
 } from '@/src/training/workoutModel';
-import { toDisplayWeight, UNIT_LABEL } from '@/src/units/weight';
+import { toEntryWeight, UNIT_LABEL } from '@/src/units/weight';
 
 type ExerciseCardProps = {
   workoutId: string;
@@ -40,7 +40,7 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
   const lastTimeSets = lastSets.data?.sets ?? NO_SETS;
   const suggestion = suggestNextSet(group.sets, lastTimeSets);
   const shownWeight =
-    weightText ?? (suggestion ? String(toDisplayWeight(suggestion.weightKg, unit)) : '');
+    weightText ?? (suggestion ? String(toEntryWeight(suggestion.weightKg, unit)) : '');
   const shownReps = repsText ?? (suggestion ? String(suggestion.reps) : '');
 
   const requestError = logSet.error ?? deleteSet.error;

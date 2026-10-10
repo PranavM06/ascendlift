@@ -45,13 +45,23 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
   const isClosing = finish.isPending || discard.isPending;
   const closeError = finish.error ?? discard.error;
 
+  // Closing the workout removes this screen's content, so leaving waits on the
+  // request itself rather than on a callback tied to the component.
+  function leaveAfter(closing: Promise<unknown>) {
+    closing.then(
+      () => router.back(),
+      // The failure is shown through the mutation's error state.
+      () => undefined
+    );
+  }
+
   function confirmDiscard() {
     Alert.alert('Discard workout?', 'This deletes every set logged in it.', [
       { text: 'Keep', style: 'cancel' },
       {
         text: 'Discard',
         style: 'destructive',
-        onPress: () => discard.mutate(workout.id, { onSuccess: () => router.back() }),
+        onPress: () => leaveAfter(discard.mutateAsync(workout.id)),
       },
     ]);
   }
@@ -85,7 +95,7 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
         <Button
           label={finish.isPending ? 'Finishing…' : 'Finish workout'}
           variant="primary"
-          onPress={() => finish.mutate(workout.id, { onSuccess: () => router.back() })}
+          onPress={() => leaveAfter(finish.mutateAsync(workout.id))}
           disabled={isClosing || workout.sets.length === 0}
         />
         <Button

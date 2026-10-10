@@ -66,6 +66,25 @@ test('pre-fills the form from last time, in the user’s unit', async () => {
   expect(screen.getByLabelText('Reps').props.value).toBe('5');
 });
 
+test('re-logs an off-plate weight unchanged when the pre-fill is not edited', async () => {
+  // Arrange: 131 lb is shown rounded as "130 lb" but must not be logged as 130.
+  const set131Lb = { ...SET_225_LB, weightKg: 59.4206 };
+  logSetMock.mockResolvedValue({ ...set131Lb, id: 'set-2' });
+  await renderCard([set131Lb]);
+
+  // Act
+  await fireEvent.press(screen.getByText('Log set'));
+
+  // Assert
+  expect(screen.getByLabelText('Weight in lb').props.value).toBe('131');
+  expect(logSetMock).toHaveBeenCalledWith('workout-1', {
+    exerciseId: 'squat',
+    reps: 5,
+    weightKg: 59.4206,
+    rpe: null,
+  });
+});
+
 test('logs the typed set in kilograms', async () => {
   // Arrange
   logSetMock.mockResolvedValue({ ...SET_225_LB, id: 'set-2', weightKg: 104.3262 });

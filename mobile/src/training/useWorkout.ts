@@ -37,6 +37,15 @@ function closeActiveWorkout(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: LAST_SETS_QUERY_KEY });
 }
 
+/**
+ * After a failed change, reload the workout. The change may have reached the
+ * server even though its response was lost, or the workout may have been
+ * changed from another device.
+ */
+function resyncActiveWorkout(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: ACTIVE_WORKOUT_QUERY_KEY });
+}
+
 export function useActiveWorkout() {
   return useQuery({ queryKey: ACTIVE_WORKOUT_QUERY_KEY, queryFn: fetchActiveWorkout });
 }
@@ -57,7 +66,7 @@ export function useStartWorkout() {
       queryClient.setQueryData<ActiveWorkout>(ACTIVE_WORKOUT_QUERY_KEY, workout);
     },
     // Most likely a workout is already in progress, started on another device.
-    onError: () => queryClient.invalidateQueries({ queryKey: ACTIVE_WORKOUT_QUERY_KEY }),
+    onError: () => resyncActiveWorkout(queryClient),
   });
 }
 
@@ -65,7 +74,12 @@ export function useLogSet(workoutId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (newSet: NewSet) => logSet(workoutId, newSet),
-    onSuccess: (logged) => updateActiveSets(queryClient, workoutId, (sets) => [...sets, logged]),
+    onSuccess: (logged) =>
+      updateActiveSets(queryClient, workoutId, (sets) =>
+        // A refetch that landed first may already include the new set.
+        sets.some((set) => set.id === logged.id) ? sets : [...sets, logged]
+      ),
+    onError: () => resyncActiveWorkout(queryClient),
   });
 }
 
@@ -75,6 +89,7 @@ export function useDeleteSet(workoutId: string) {
     mutationFn: (setId: string) => deleteSet(workoutId, setId),
     onSuccess: (_result, setId) =>
       updateActiveSets(queryClient, workoutId, (sets) => sets.filter((set) => set.id !== setId)),
+    onError: () => resyncActiveWorkout(queryClient),
   });
 }
 
@@ -83,6 +98,7 @@ export function useFinishWorkout() {
   return useMutation({
     mutationFn: finishWorkout,
     onSuccess: () => closeActiveWorkout(queryClient),
+    onError: () => resyncActiveWorkout(queryClient),
   });
 }
 
@@ -91,5 +107,6 @@ export function useDiscardWorkout() {
   return useMutation({
     mutationFn: deleteWorkout,
     onSuccess: () => closeActiveWorkout(queryClient),
+    onError: () => resyncActiveWorkout(queryClient),
   });
 }
