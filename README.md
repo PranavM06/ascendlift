@@ -45,7 +45,28 @@ npm install
 npx expo start                  # scan the QR code with the iPhone camera
 ```
 
-Sign in with Apple works in Expo Go because the backend accepts Expo Go's audience (`host.exp.Exponent`) in development. A standalone build needs the app's own bundle id in `ASCENDLIFT_APPLE_AUDIENCES`.
+Sign in with Apple works in the App Store's Expo Go because the backend accepts Expo Go's audience (`host.exp.Exponent`) in development. When the App Store's Expo Go is older than this project's Expo SDK, or was built with `eas go`, it has no Sign in with Apple and the sign-in screen says so; use a development build instead.
+
+### Development build
+
+A development build is the AscendLift app itself, with a menu for loading code from this Mac. It needs an Apple Developer account and an [Expo account](https://expo.dev/signup).
+
+```bash
+cd mobile
+npx eas-cli@latest login
+npx eas-cli@latest device:create                                   # once per iPhone: open the link on the phone and install the profile
+npx eas-cli@latest build --profile development --platform ios      # about 15 minutes, in the cloud
+```
+
+When the build finishes, scan its QR code with the iPhone camera to install it, turn on Developer Mode (Settings > Privacy & Security) if iOS asks, then run `npx expo start` and open AscendLift on the phone.
+
+The backend must trust the app's bundle id, so `backend/.env` needs it in the list, followed by a backend restart:
+
+```
+ASCENDLIFT_APPLE_AUDIENCES=["host.exp.Exponent", "com.pranavmeka.ascendlift"]
+```
+
+A new build is only needed after adding a library with native code or changing `app.json`; everyday code changes load from `npx expo start`.
 
 App checks, run from `mobile/`:
 

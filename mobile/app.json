@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.pranavmeka.ascendlift",
       "usesAppleSignIn": true
     },
     "android": {
