@@ -43,6 +43,15 @@ export default function RootLayout() {
         <Stack>
           <Stack.Protected guard={isSignedIn}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="workout" options={{ title: 'Workout' }} />
+            <Stack.Screen
+              name="exercise-picker"
+              options={{ title: 'Add exercise', presentation: 'modal' }}
+            />
+            <Stack.Screen
+              name="new-exercise"
+              options={{ title: 'New exercise', presentation: 'modal' }}
+            />
           </Stack.Protected>
           <Stack.Protected guard={!isSignedIn}>
             <Stack.Screen name="sign-in" options={{ headerShown: false }} />
