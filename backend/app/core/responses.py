@@ -7,6 +7,11 @@ class ApiResponse[T](BaseModel):
     error: str | None = None
 
 
+# The largest `offset` a paged endpoint accepts: far past the end of any real
+# list, and safely inside a database integer.
+MAX_OFFSET = 100_000
+
+
 class Page[T](BaseModel):
     """One page of a longer list, sent as the `data` of a response."""
 

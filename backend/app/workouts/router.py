@@ -1,19 +1,23 @@
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 from app.auth.deps import CurrentUser
 from app.core.rate_limit import WRITE_RATE_LIMIT, limiter
-from app.core.responses import ApiResponse, ok
+from app.core.responses import ApiResponse, Page, ok
 from app.db.session import DbSession
 from app.workouts import service
 from app.workouts.schemas import (
+    HistoryQuery,
     LastSetsResponse,
+    RecordsResponse,
     SetCreate,
     SetResponse,
     SetUpdate,
     WorkoutResponse,
+    WorkoutSummaryResponse,
 )
 
 CREATED = 201
@@ -33,7 +37,31 @@ def start_workout(
     return ok(WorkoutResponse.from_detail(detail))
 
 
+@router.get("")
+def list_history(
+    query: Annotated[HistoryQuery, Query()], user: CurrentUser, db: DbSession
+) -> ApiResponse[Page[WorkoutSummaryResponse]]:
+    page = service.list_history(db, user.id, query.limit, query.offset)
+    return ok(
+        Page[WorkoutSummaryResponse](
+            items=[WorkoutSummaryResponse.from_summary(item) for item in page.items],
+            total=page.total,
+            limit=query.limit,
+            offset=query.offset,
+        )
+    )
+
+
 # The fixed paths are declared before "/{workout_id}" so they are not read as ids.
+
+
+@router.get("/records")
+def read_records(
+    exercise_id: uuid.UUID, user: CurrentUser, db: DbSession
+) -> ApiResponse[RecordsResponse]:
+    return ok(
+        RecordsResponse.model_validate(service.get_records(db, user.id, exercise_id))
+    )
 
 
 @router.get("/active")

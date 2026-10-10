@@ -68,6 +68,8 @@ Every response has the shape `{"success": bool, "data": ..., "error": string | n
 | `GET /exercises` | bearer | The shared exercise library plus the user's own exercises, by name. Query `search?`, `muscle_group?`, `equipment?`, `limit?` (default 50, at most 100), `offset?`. Returns `{items, total, limit, offset}` |
 | `POST /exercises` | bearer | Body `{name, muscle_groups, equipment?}`. Adds an exercise only this user can see; 409 if they already have one with that name, or already have 500 |
 | `POST /workouts` | bearer | Starts a workout; 409 if one is already in progress. Returns `{id, started_at, ended_at, template_id, sets}` |
+| `GET /workouts` | bearer | Finished workouts, newest first. Query `limit?` (default 20, at most 50), `offset?`. Returns a page of `{id, started_at, ended_at, template_id, set_count, exercise_names, volume_kg}` |
+| `GET /workouts/records?exercise_id=` | bearer | The user's records for an exercise across finished workouts: `{heaviest, best_estimated_1rm}`, each `{workout_id, achieved_at, reps, weight_kg, estimated_1rm_kg}` or `null`. The estimate is Epley's formula and is left out above 12 reps |
 | `GET /workouts/active` | bearer | The workout in progress with its sets, or `null` |
 | `GET /workouts/last-sets?exercise_id=` | bearer | The exercise's sets from the latest finished workout that included it, as `{workout_id, started_at, sets}`, or `null` |
 | `GET /workouts/{id}` | bearer | One workout with its sets |

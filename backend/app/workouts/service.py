@@ -3,9 +3,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from itertools import groupby
 from typing import Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,11 @@ EXERCISE_NOT_FOUND_MESSAGE = "Exercise not found"
 WORKOUT_IN_PROGRESS_MESSAGE = "A workout is already in progress"
 # Far more than a real session holds; bounds the size of one workout response.
 MAX_SETS_PER_WORKOUT = 500
+# Epley's formula: one-rep max = weight * (1 + reps / 30).
+EPLEY_DIVISOR = 30
+# Above this many reps the estimate says more about endurance than strength.
+MAX_REPS_FOR_ESTIMATE = 12
+KG_PRECISION = Decimal("0.0001")
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,44 @@ class LastSets:
     workout_id: uuid.UUID
     started_at: datetime
     sets: list[LoggedSet]
+
+
+@dataclass(frozen=True)
+class _SummarySet:
+    reps: int
+    weight_kg: Decimal
+    exercise_name: str
+
+
+@dataclass(frozen=True)
+class WorkoutSummary:
+    workout: WorkoutSession
+    set_count: int
+    # Each exercise once, in the order it was first logged.
+    exercise_names: list[str]
+    # Weight times reps, added up over every set.
+    volume_kg: Decimal
+
+
+@dataclass(frozen=True)
+class WorkoutHistoryPage:
+    items: list[WorkoutSummary]
+    total: int
+
+
+@dataclass(frozen=True)
+class RecordSet:
+    workout_id: uuid.UUID
+    achieved_at: datetime
+    reps: int
+    weight_kg: Decimal
+    estimated_1rm_kg: Decimal | None
+
+
+@dataclass(frozen=True)
+class ExerciseRecords:
+    heaviest: RecordSet | None
+    best_estimated_1rm: RecordSet | None
 
 
 def _workout_not_found() -> AppError:
@@ -237,6 +281,122 @@ def delete_set(
     if deleted_id is None:
         raise _set_not_found()
     db.commit()
+
+
+def _summarise(workout: WorkoutSession, sets: list[_SummarySet]) -> WorkoutSummary:
+    return WorkoutSummary(
+        workout=workout,
+        set_count=len(sets),
+        # dict.fromkeys drops repeats while keeping first-logged order.
+        exercise_names=list(dict.fromkeys(logged.exercise_name for logged in sets)),
+        volume_kg=sum((logged.weight_kg * logged.reps for logged in sets), Decimal(0)),
+    )
+
+
+def list_history(
+    db: Session, user_id: uuid.UUID, limit: int, offset: int
+) -> WorkoutHistoryPage:
+    """A page of the user's finished workouts, newest first."""
+    finished = (
+        WorkoutSession.user_id == user_id,
+        WorkoutSession.ended_at.is_not(None),
+    )
+    total = db.scalar(select(func.count()).select_from(WorkoutSession).where(*finished))
+    workouts = db.scalars(
+        select(WorkoutSession)
+        .where(*finished)
+        .order_by(WorkoutSession.started_at.desc(), WorkoutSession.id)
+        .limit(limit)
+        .offset(offset)
+        .execution_options(populate_existing=True)
+    ).all()
+
+    # One query for the whole page's sets, rather than one per workout.
+    rows = db.execute(
+        select(
+            WorkoutSet.session_id, WorkoutSet.reps, WorkoutSet.weight_kg, Exercise.name
+        )
+        .join(Exercise, Exercise.id == WorkoutSet.exercise_id)
+        .where(WorkoutSet.session_id.in_([workout.id for workout in workouts]))
+        .order_by(WorkoutSet.session_id, WorkoutSet.position)
+    )
+    sets_by_workout = {
+        workout_id: [
+            _SummarySet(reps=row.reps, weight_kg=row.weight_kg, exercise_name=row.name)
+            for row in workout_rows
+        ]
+        for workout_id, workout_rows in groupby(rows, key=lambda row: row.session_id)
+    }
+    return WorkoutHistoryPage(
+        items=[
+            _summarise(workout, sets_by_workout.get(workout.id, []))
+            for workout in workouts
+        ],
+        total=total or 0,
+    )
+
+
+def estimate_one_rep_max(weight_kg: Decimal, reps: int) -> Decimal | None:
+    """The Epley estimate of a one-rep max, or None when reps are too high to trust."""
+    if reps < 1 or reps > MAX_REPS_FOR_ESTIMATE:
+        return None
+    if reps == 1:
+        return weight_kg
+    return (weight_kg * (EPLEY_DIVISOR + reps) / EPLEY_DIVISOR).quantize(KG_PRECISION)
+
+
+def get_records(
+    db: Session, user_id: uuid.UUID, exercise_id: uuid.UUID
+) -> ExerciseRecords:
+    """The user's best sets of an exercise across their finished workouts."""
+    completed_sets = (
+        select(
+            WorkoutSession.id,
+            WorkoutSession.started_at,
+            WorkoutSet.reps,
+            WorkoutSet.weight_kg,
+        )
+        .join(WorkoutSession, WorkoutSession.id == WorkoutSet.session_id)
+        .where(
+            WorkoutSession.user_id == user_id,
+            WorkoutSession.ended_at.is_not(None),
+            WorkoutSet.exercise_id == exercise_id,
+            WorkoutSet.reps > 0,
+        )
+    )
+    # A record that is later only matched stays with the set that set it.
+    earliest_first = (WorkoutSession.started_at, WorkoutSet.position)
+    # Orders sets the same way as the Epley estimate, without dividing.
+    estimate_rank = case(
+        (WorkoutSet.reps == 1, WorkoutSet.weight_kg * EPLEY_DIVISOR),
+        else_=WorkoutSet.weight_kg * (EPLEY_DIVISOR + WorkoutSet.reps),
+    )
+
+    heaviest = db.execute(
+        completed_sets.order_by(
+            WorkoutSet.weight_kg.desc(), WorkoutSet.reps.desc(), *earliest_first
+        ).limit(1)
+    ).one_or_none()
+    best_estimate = db.execute(
+        completed_sets.where(WorkoutSet.reps <= MAX_REPS_FOR_ESTIMATE)
+        .order_by(estimate_rank.desc(), *earliest_first)
+        .limit(1)
+    ).one_or_none()
+
+    def to_record(row: Any) -> RecordSet | None:
+        if row is None:
+            return None
+        return RecordSet(
+            workout_id=row.id,
+            achieved_at=row.started_at,
+            reps=row.reps,
+            weight_kg=row.weight_kg,
+            estimated_1rm_kg=estimate_one_rep_max(row.weight_kg, row.reps),
+        )
+
+    return ExerciseRecords(
+        heaviest=to_record(heaviest), best_estimated_1rm=to_record(best_estimate)
+    )
 
 
 def get_last_sets(

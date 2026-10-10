@@ -3,14 +3,13 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
+from app.core.responses import MAX_OFFSET
 from app.models import Equipment, Exercise, MuscleGroup
 
 MAX_EXERCISE_NAME_LENGTH = 100
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
 
-# Far past the end of any real library; keeps the value inside a database integer.
-MAX_OFFSET = 100_000
 # Control characters, which include the NUL byte Postgres text cannot store.
 NO_CONTROL_CHARACTERS = r"^[^\x00-\x1f\x7f]*$"
 
