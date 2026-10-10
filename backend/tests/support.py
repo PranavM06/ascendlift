@@ -1,4 +1,4 @@
-"""Helpers shared by the auth tests: a fake Apple key server and token minter."""
+"""Helpers shared by the API tests: a fake Apple key server and token minter."""
 
 import time
 from dataclasses import dataclass
@@ -110,3 +110,11 @@ def sign_in(
 
 def bearer(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
+
+
+def sign_in_as(
+    client: TestClient, apple_tokens: AppleTokenMinter, subject: str
+) -> dict[str, str]:
+    """Sign in as the Apple account `subject` and return its bearer headers."""
+    pair = sign_in(client, apple_tokens, subject=subject, email=None)
+    return bearer(pair["access_token"])

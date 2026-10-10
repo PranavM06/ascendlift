@@ -65,6 +65,8 @@ Every response has the shape `{"success": bool, "data": ..., "error": string | n
 | `POST /auth/logout` | none | Body `{refresh_token}`. Revokes it |
 | `GET /users/me` | bearer | The signed-in user's profile |
 | `PATCH /users/me` | bearer | Body `{name?, timezone?, unit_preference?}`. Changes only the fields sent |
+| `GET /exercises` | bearer | The shared exercise library plus the user's own exercises, by name. Query `search?`, `muscle_group?`, `equipment?`, `limit?` (default 50, at most 100), `offset?`. Returns `{items, total, limit, offset}` |
+| `POST /exercises` | bearer | Body `{name, muscle_groups, equipment?}`. Adds an exercise only this user can see; 409 if they already have one with that name |
 
 Sign-in works like this:
 
