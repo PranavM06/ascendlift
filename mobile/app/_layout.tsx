@@ -55,6 +55,8 @@ export default function RootLayout() {
               name="new-exercise"
               options={{ title: 'New exercise', presentation: 'modal' }}
             />
+            <Stack.Screen name="food-search" options={{ title: 'Add food' }} />
+            <Stack.Screen name="food-entry" options={{ title: 'Food' }} />
           </Stack.Protected>
           <Stack.Protected guard={!isSignedIn}>
             <Stack.Screen name="sign-in" options={{ headerShown: false }} />
