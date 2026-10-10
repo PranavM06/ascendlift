@@ -8,11 +8,14 @@ import {
   finishWorkout,
   logSet,
   startWorkout,
+  updateSet,
   type NewSet,
+  type SetChanges,
   type Workout,
   type WorkoutSet,
 } from '@/src/api/workouts';
 import { clearPickedExercises } from '@/src/training/pickedExercises';
+import { stopRest } from '@/src/training/restTimer';
 
 export const ACTIVE_WORKOUT_QUERY_KEY = ['workouts', 'active'] as const;
 const LAST_SETS_QUERY_KEY = ['workouts', 'last-sets'] as const;
@@ -33,6 +36,7 @@ function updateActiveSets(
 
 function closeActiveWorkout(queryClient: QueryClient): void {
   clearPickedExercises();
+  stopRest();
   queryClient.setQueryData<ActiveWorkout>(ACTIVE_WORKOUT_QUERY_KEY, null);
   void queryClient.invalidateQueries({ queryKey: LAST_SETS_QUERY_KEY });
 }
@@ -78,6 +82,19 @@ export function useLogSet(workoutId: string) {
       updateActiveSets(queryClient, workoutId, (sets) =>
         // A refetch that landed first may already include the new set.
         sets.some((set) => set.id === logged.id) ? sets : [...sets, logged]
+      ),
+    onError: () => resyncActiveWorkout(queryClient),
+  });
+}
+
+export function useUpdateSet(workoutId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ setId, changes }: { setId: string; changes: SetChanges }) =>
+      updateSet(workoutId, setId, changes),
+    onSuccess: (updated) =>
+      updateActiveSets(queryClient, workoutId, (sets) =>
+        sets.map((set) => (set.id === updated.id ? updated : set))
       ),
     onError: () => resyncActiveWorkout(queryClient),
   });

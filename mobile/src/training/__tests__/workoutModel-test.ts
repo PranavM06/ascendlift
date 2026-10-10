@@ -1,6 +1,7 @@
 import type { WorkoutSet } from '@/src/api/workouts';
 import {
   describeSet,
+  formatDuration,
   formatElapsed,
   groupSetsByExercise,
   parseSetEntry,
@@ -113,6 +114,16 @@ describe('formatElapsed', () => {
 
   test('never shows a negative time when the clocks disagree', () => {
     expect(formatElapsed(startedAt, new Date('2026-10-09T17:59:00Z'))).toBe('0:00');
+  });
+});
+
+describe('formatDuration', () => {
+  test.each([
+    [0, '0:00'],
+    [90, '1:30'],
+    [3723, '1:02:03'],
+  ])('shows %p seconds as %p', (seconds, expected) => {
+    expect(formatDuration(seconds)).toBe(expected);
   });
 });
 

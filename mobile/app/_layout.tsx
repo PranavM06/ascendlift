@@ -48,6 +48,10 @@ export default function RootLayout() {
               name="exercise-picker"
               options={{ title: 'Add exercise', presentation: 'modal' }}
             />
+            <Stack.Screen
+              name="new-exercise"
+              options={{ title: 'New exercise', presentation: 'modal' }}
+            />
           </Stack.Protected>
           <Stack.Protected guard={!isSignedIn}>
             <Stack.Screen name="sign-in" options={{ headerShown: false }} />

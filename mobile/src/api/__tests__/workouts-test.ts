@@ -1,5 +1,5 @@
 import { authorizedRequest } from '@/src/api/authorized';
-import { searchExercises } from '@/src/api/exercises';
+import { createExercise, searchExercises } from '@/src/api/exercises';
 import {
   deleteSet,
   deleteWorkout,
@@ -8,6 +8,7 @@ import {
   finishWorkout,
   logSet,
   startWorkout,
+  updateSet,
 } from '@/src/api/workouts';
 
 jest.mock('@/src/api/authorized', () => ({ authorizedRequest: jest.fn() }));
@@ -104,6 +105,26 @@ describe('workouts', () => {
     });
   });
 
+  test('edits a set with a PATCH request in kilograms', async () => {
+    // Arrange
+    authorizedRequestMock.mockResolvedValueOnce({ ...SET_JSON, reps: 6, rpe: null });
+
+    // Act
+    const updated = await updateSet('workout-1', 'set-1', {
+      reps: 6,
+      weightKg: 102.0583,
+      rpe: null,
+    });
+
+    // Assert
+    expect(updated).toEqual({ ...SET, reps: 6, rpe: null });
+    expect(authorizedRequestMock).toHaveBeenCalledWith('/workouts/workout-1/sets/set-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reps: 6, weight_kg: 102.0583, rpe: null }),
+    });
+  });
+
   test('deletes sets and workouts with DELETE requests', async () => {
     // Arrange
     authorizedRequestMock.mockResolvedValue(null);
@@ -194,6 +215,42 @@ describe('exercises', () => {
     expect(authorizedRequestMock).toHaveBeenCalledWith(
       '/exercises?limit=50&search=bench%20%26%20press'
     );
+  });
+
+  test('creates a custom exercise', async () => {
+    // Arrange
+    authorizedRequestMock.mockResolvedValueOnce({
+      ...EXERCISE_JSON,
+      id: 'sled',
+      name: 'Sled Drag',
+      equipment: null,
+      is_custom: true,
+    });
+
+    // Act
+    const created = await createExercise({
+      name: 'Sled Drag',
+      muscleGroups: ['quadriceps', 'glutes'],
+      equipment: null,
+    });
+
+    // Assert
+    expect(created).toEqual({
+      id: 'sled',
+      name: 'Sled Drag',
+      muscleGroups: ['quadriceps', 'glutes'],
+      equipment: null,
+      isCustom: true,
+    });
+    expect(authorizedRequestMock).toHaveBeenCalledWith('/exercises', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Sled Drag',
+        muscle_groups: ['quadriceps', 'glutes'],
+        equipment: null,
+      }),
+    });
   });
 
   test('lists the library when the search is blank', async () => {

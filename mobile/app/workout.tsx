@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,23 +11,14 @@ import {
 import { Button } from '@/components/Button';
 import { Text, View } from '@/components/Themed';
 import { ExerciseCard } from '@/components/training/ExerciseCard';
+import { RestTimer } from '@/components/training/RestTimer';
 import { userMessage } from '@/src/api/http';
 import type { Workout } from '@/src/api/workouts';
 import { usePickedExercisesFor } from '@/src/training/pickedExercises';
+import { useNow } from '@/src/training/useNow';
 import { useActiveWorkout, useDiscardWorkout, useFinishWorkout } from '@/src/training/useWorkout';
 import { formatElapsed, groupSetsByExercise } from '@/src/training/workoutModel';
 import { useUnitPreference } from '@/src/units/useUnitPreference';
-
-const CLOCK_TICK_MS = 1000;
-
-function useNow(): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), CLOCK_TICK_MS);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-}
 
 function ElapsedTime({ startedAt }: { startedAt: string }) {
   const now = useNow();
@@ -70,6 +60,8 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Outside the scroll view so the countdown stays in sight. */}
+      <RestTimer />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <ElapsedTime startedAt={workout.startedAt} />
 

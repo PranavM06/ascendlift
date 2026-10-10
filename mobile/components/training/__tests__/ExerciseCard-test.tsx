@@ -1,14 +1,22 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { ExerciseCard } from '@/components/training/ExerciseCard';
-import { deleteSet, fetchLastSets, logSet, type WorkoutSet } from '@/src/api/workouts';
+import {
+  deleteSet,
+  fetchLastSets,
+  logSet,
+  updateSet,
+  type WorkoutSet,
+} from '@/src/api/workouts';
+import { stopRest, useRestTimer } from '@/src/training/restTimer';
 
 jest.mock('@/src/api/workouts');
 
 const fetchLastSetsMock = jest.mocked(fetchLastSets);
 const logSetMock = jest.mocked(logSet);
 const deleteSetMock = jest.mocked(deleteSet);
+const updateSetMock = jest.mocked(updateSet);
 
 const SQUAT = { id: 'squat', name: 'Barbell Squat' };
 // 225 lb, as the backend stores it.
@@ -43,8 +51,10 @@ async function renderCard(loggedSets: WorkoutSet[] = []) {
 beforeEach(() => {
   // Only these mocks are reset: resetting every mock would also wipe the ones
   // React Native's test setup installs, such as the colour scheme.
+  stopRest();
   logSetMock.mockReset();
   deleteSetMock.mockReset();
+  updateSetMock.mockReset();
   fetchLastSetsMock.mockReset();
   fetchLastSetsMock.mockResolvedValue(null);
 });
@@ -128,6 +138,53 @@ test('lists logged sets and deletes the one tapped', async () => {
   // Assert
   expect(screen.getByText('225 lb × 5')).toBeTruthy();
   expect(deleteSetMock).toHaveBeenCalledWith('workout-1', 'set-1');
+});
+
+test('edits a logged set in place', async () => {
+  // Arrange
+  updateSetMock.mockResolvedValue({ ...SET_225_LB, reps: 6 });
+  await renderCard([SET_225_LB]);
+
+  // Act
+  await fireEvent.press(screen.getByLabelText('Edit set 1 of Barbell Squat'));
+  const weightWhileEditing = screen.getByLabelText('Weight in lb').props.value;
+  await fireEvent.changeText(screen.getByLabelText('Reps'), '6');
+  await fireEvent.press(screen.getByText('Save'));
+
+  // Assert
+  expect(weightWhileEditing).toBe('225');
+  expect(updateSetMock).toHaveBeenCalledWith('workout-1', 'set-1', {
+    reps: 6,
+    weightKg: 102.0583,
+    rpe: null,
+  });
+  expect(await screen.findByText('Log set')).toBeTruthy();
+});
+
+test('cancelling an edit changes nothing', async () => {
+  // Arrange
+  await renderCard([SET_225_LB]);
+
+  // Act
+  await fireEvent.press(screen.getByLabelText('Edit set 1 of Barbell Squat'));
+  await fireEvent.changeText(screen.getByLabelText('Reps'), '6');
+  await fireEvent.press(screen.getByText('Cancel'));
+
+  // Assert
+  expect(updateSetMock).not.toHaveBeenCalled();
+  expect(screen.getByText('225 lb × 5')).toBeTruthy();
+});
+
+test('starts the rest timer once a set is logged', async () => {
+  // Arrange
+  logSetMock.mockResolvedValue({ ...SET_225_LB, id: 'set-2' });
+  await renderCard([SET_225_LB]);
+
+  // Act
+  await fireEvent.press(screen.getByText('Log set'));
+
+  // Assert
+  await waitFor(() => expect(useRestTimer.getState().endsAt).not.toBeNull());
 });
 
 test('shows the server’s message when a set cannot be saved', async () => {

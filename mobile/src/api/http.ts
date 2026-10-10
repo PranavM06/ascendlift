@@ -67,14 +67,26 @@ export async function requestJson(url: string, init?: RequestInit): Promise<unkn
   return envelope.data;
 }
 
-type JsonPost = { method: 'POST'; headers: Record<string, string>; body: string };
+type JsonRequest<Method extends string> = {
+  method: Method;
+  headers: Record<string, string>;
+  body: string;
+};
 
-export function jsonPost(body: unknown): JsonPost {
+function jsonRequest<Method extends string>(method: Method, body: unknown): JsonRequest<Method> {
   return {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   };
+}
+
+export function jsonPost(body: unknown): JsonRequest<'POST'> {
+  return jsonRequest('POST', body);
+}
+
+export function jsonPatch(body: unknown): JsonRequest<'PATCH'> {
+  return jsonRequest('PATCH', body);
 }
 
 export function unexpectedResponse(): ApiError {

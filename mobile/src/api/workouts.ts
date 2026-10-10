@@ -1,5 +1,5 @@
 import { authorizedRequest } from '@/src/api/authorized';
-import { isRecord, jsonPost, unexpectedResponse } from '@/src/api/http';
+import { isRecord, jsonPatch, jsonPost, unexpectedResponse } from '@/src/api/http';
 
 export type ExerciseRef = { id: string; name: string };
 
@@ -33,6 +33,9 @@ export type NewSet = {
   weightKg: number;
   rpe: number | null;
 };
+
+/** The values of a set after an edit. A null `rpe` clears it. */
+export type SetChanges = Omit<NewSet, 'exerciseId'>;
 
 /** The backend sends decimals as strings such as "102.0583". */
 function toNumber(value: unknown): number {
@@ -134,6 +137,17 @@ export async function logSet(workoutId: string, newSet: NewSet): Promise<Workout
     rpe: newSet.rpe,
   };
   return toWorkoutSet(await authorizedRequest(`/workouts/${workoutId}/sets`, jsonPost(body)));
+}
+
+export async function updateSet(
+  workoutId: string,
+  setId: string,
+  changes: SetChanges
+): Promise<WorkoutSet> {
+  const body = { reps: changes.reps, weight_kg: changes.weightKg, rpe: changes.rpe };
+  return toWorkoutSet(
+    await authorizedRequest(`/workouts/${workoutId}/sets/${setId}`, jsonPatch(body))
+  );
 }
 
 export async function deleteSet(workoutId: string, setId: string): Promise<void> {

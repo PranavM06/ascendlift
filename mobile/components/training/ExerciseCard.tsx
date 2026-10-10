@@ -1,19 +1,22 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { Button } from '@/components/Button';
-import { Text, useThemeColor, View } from '@/components/Themed';
+import { Text, View } from '@/components/Themed';
+import { SetFields } from '@/components/training/SetFields';
+import { SetRow } from '@/components/training/SetRow';
 import { userMessage } from '@/src/api/http';
 import type { UnitPreference } from '@/src/api/users';
 import type { WorkoutSet } from '@/src/api/workouts';
-import { useDeleteSet, useLastSets, useLogSet } from '@/src/training/useWorkout';
+import { startRest } from '@/src/training/restTimer';
+import { useLastSets, useLogSet } from '@/src/training/useWorkout';
 import {
   describeSet,
   parseSetEntry,
   suggestNextSet,
   type ExerciseGroup,
 } from '@/src/training/workoutModel';
-import { toEntryWeight, UNIT_LABEL } from '@/src/units/weight';
+import { toEntryWeight } from '@/src/units/weight';
 
 type ExerciseCardProps = {
   workoutId: string;
@@ -22,20 +25,17 @@ type ExerciseCardProps = {
 };
 
 const NO_SETS: WorkoutSet[] = [];
-const PLACEHOLDER_COLOR = '#888';
-const DELETE_HIT_SLOP = 8;
 
 /** One exercise in the workout: its logged sets and the form for the next one. */
 export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
-  const textColor = useThemeColor({}, 'text');
   const lastSets = useLastSets(group.exercise.id);
   const logSet = useLogSet(workoutId);
-  const deleteSet = useDeleteSet(workoutId);
   // null means "not typed in yet", so the field shows the suggested value.
   const [weightText, setWeightText] = useState<string | null>(null);
   const [repsText, setRepsText] = useState<string | null>(null);
   const [rpeText, setRpeText] = useState('');
   const [entryError, setEntryError] = useState<string | null>(null);
+  const [editingSetId, setEditingSetId] = useState<string | null>(null);
 
   const lastTimeSets = lastSets.data?.sets ?? NO_SETS;
   const suggestion = suggestNextSet(group.sets, lastTimeSets);
@@ -43,9 +43,8 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
     weightText ?? (suggestion ? String(toEntryWeight(suggestion.weightKg, unit)) : '');
   const shownReps = repsText ?? (suggestion ? String(suggestion.reps) : '');
 
-  const requestError = logSet.error ?? deleteSet.error;
   const errorMessage =
-    entryError ?? (requestError ? userMessage(requestError, "Couldn't save. Try again.") : null);
+    entryError ?? (logSet.error ? userMessage(logSet.error, "Couldn't save. Try again.") : null);
 
   function handleLogSet() {
     const parsed = parseSetEntry({ weightText: shownWeight, repsText: shownReps, rpeText }, unit);
@@ -62,17 +61,16 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
         rpe: parsed.rpe,
       },
       {
-        // Back to "not typed in", so the form now suggests the set just logged.
         onSuccess: () => {
+          // Back to "not typed in", so the form now suggests the set just logged.
           setWeightText(null);
           setRepsText(null);
           setRpeText('');
+          startRest(Date.now());
         },
       }
     );
   }
-
-  const inputStyle = [styles.input, { color: textColor }];
 
   return (
     <View style={styles.card}>
@@ -84,50 +82,33 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
       ) : null}
 
       {group.sets.map((set, index) => (
-        <View key={set.id} style={styles.setRow}>
-          <Text style={styles.setNumber}>{index + 1}</Text>
-          <Text style={styles.setText}>{describeSet(set, unit)}</Text>
-          <Pressable
-            onPress={() => deleteSet.mutate(set.id)}
-            disabled={deleteSet.isPending}
-            hitSlop={DELETE_HIT_SLOP}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete set ${index + 1} of ${group.exercise.name}`}>
-            <Text style={styles.delete}>Delete</Text>
-          </Pressable>
-        </View>
+        <SetRow
+          key={set.id}
+          workoutId={workoutId}
+          set={set}
+          number={index + 1}
+          unit={unit}
+          isEditing={editingSetId === set.id}
+          onStartEdit={() => setEditingSetId(set.id)}
+          onStopEdit={() => setEditingSetId(null)}
+        />
       ))}
 
-      <View style={styles.form}>
-        <TextInput
-          style={inputStyle}
-          value={shownWeight}
-          onChangeText={setWeightText}
-          keyboardType="decimal-pad"
-          placeholder={UNIT_LABEL[unit]}
-          placeholderTextColor={PLACEHOLDER_COLOR}
-          accessibilityLabel={`Weight in ${UNIT_LABEL[unit]}`}
-        />
-        <TextInput
-          style={inputStyle}
-          value={shownReps}
-          onChangeText={setRepsText}
-          keyboardType="number-pad"
-          placeholder="reps"
-          placeholderTextColor={PLACEHOLDER_COLOR}
-          accessibilityLabel="Reps"
-        />
-        <TextInput
-          style={inputStyle}
-          value={rpeText}
-          onChangeText={setRpeText}
-          keyboardType="decimal-pad"
-          placeholder="RPE"
-          placeholderTextColor={PLACEHOLDER_COLOR}
-          accessibilityLabel="RPE, optional"
-        />
-        <Button label="Log set" onPress={handleLogSet} disabled={logSet.isPending} />
-      </View>
+      {/* One form at a time: the new-set form steps aside while a set is edited. */}
+      {editingSetId === null ? (
+        <View style={styles.form}>
+          <SetFields
+            unit={unit}
+            weightText={shownWeight}
+            repsText={shownReps}
+            rpeText={rpeText}
+            onChangeWeight={setWeightText}
+            onChangeReps={setRepsText}
+            onChangeRpe={setRpeText}
+          />
+          <Button label="Log set" onPress={handleLogSet} disabled={logSet.isPending} />
+        </View>
+      ) : null}
 
       {errorMessage ? (
         <Text style={styles.error} accessibilityRole="alert">
@@ -154,39 +135,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.7,
   },
-  setRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  setNumber: {
-    width: 20,
-    fontSize: 16,
-    opacity: 0.6,
-  },
-  setText: {
-    flex: 1,
-    fontSize: 16,
-  },
-  delete: {
-    fontSize: 14,
-    color: '#c0392b',
-  },
   form: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#888',
-    fontSize: 16,
-    textAlign: 'center',
   },
   error: {
     fontSize: 14,

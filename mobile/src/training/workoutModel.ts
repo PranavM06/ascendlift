@@ -91,7 +91,11 @@ export function parseSetEntry(entry: SetEntry, unit: UnitPreference): ParsedSetE
 /** Time since the workout started, as "m:ss" or "h:mm:ss". */
 export function formatElapsed(startedAt: string, now: Date): string {
   const elapsedMs = Math.max(0, now.getTime() - new Date(startedAt).getTime());
-  const totalSeconds = Math.floor(elapsedMs / MS_PER_SECOND);
+  return formatDuration(Math.floor(elapsedMs / MS_PER_SECOND));
+}
+
+/** A number of seconds as "m:ss", or "h:mm:ss" from an hour up. */
+export function formatDuration(totalSeconds: number): string {
   const seconds = totalSeconds % SECONDS_PER_MINUTE;
   const totalMinutes = Math.floor(totalSeconds / SECONDS_PER_MINUTE);
   const minutes = totalMinutes % MINUTES_PER_HOUR;
