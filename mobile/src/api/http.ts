@@ -67,7 +67,9 @@ export async function requestJson(url: string, init?: RequestInit): Promise<unkn
   return envelope.data;
 }
 
-export function jsonPost(body: unknown): RequestInit {
+type JsonPost = { method: 'POST'; headers: Record<string, string>; body: string };
+
+export function jsonPost(body: unknown): JsonPost {
   return {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
