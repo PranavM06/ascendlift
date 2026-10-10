@@ -24,6 +24,13 @@ WeightKg = Annotated[
 Rpe = Annotated[Decimal, Field(ge=MIN_RPE, le=MAX_RPE, multiple_of=RPE_STEP)]
 
 
+class WorkoutStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # The template to start from; left out for a blank workout.
+    template_id: uuid.UUID | None = None
+
+
 class SetCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

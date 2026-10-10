@@ -67,7 +67,12 @@ Every response has the shape `{"success": bool, "data": ..., "error": string | n
 | `PATCH /users/me` | bearer | Body `{name?, timezone?, unit_preference?}`. Changes only the fields sent |
 | `GET /exercises` | bearer | The shared exercise library plus the user's own exercises, by name. Query `search?`, `muscle_group?`, `equipment?`, `limit?` (default 50, at most 100), `offset?`. Returns `{items, total, limit, offset}` |
 | `POST /exercises` | bearer | Body `{name, muscle_groups, equipment?}`. Adds an exercise only this user can see; 409 if they already have one with that name, or already have 500 |
-| `POST /workouts` | bearer | Starts a workout; 409 if one is already in progress. Returns `{id, started_at, ended_at, template_id, sets}` |
+| `GET /templates` | bearer | The user's routine templates by name, each `{id, name, notes, exercises}`. An exercise entry is `{id, exercise: {id, name}, position, target_sets, rep_min, rep_max, target_weight_kg, target_rpe}` |
+| `POST /templates` | bearer | Body `{name, notes?, exercises}`, with exercises in performing order as `{exercise_id, target_sets, rep_min, rep_max, target_weight_kg?, target_rpe?}`. At most 100 templates per user |
+| `GET /templates/{id}` | bearer | One template |
+| `PUT /templates/{id}` | bearer | Same body as creating; replaces the name, notes and exercises |
+| `DELETE /templates/{id}` | bearer | Deletes the template. Workouts started from it are kept and lose the link |
+| `POST /workouts` | bearer | Starts a workout; 409 if one is already in progress. Optional body `{template_id}` starts it from a template. Returns `{id, started_at, ended_at, template_id, sets}` |
 | `GET /workouts` | bearer | Finished workouts, newest first. Query `limit?` (default 20, at most 50), `offset?`. Returns a page of `{id, started_at, ended_at, template_id, set_count, exercise_names, volume_kg}` |
 | `GET /workouts/records?exercise_id=` | bearer | The user's records for an exercise across finished workouts: `{heaviest, best_estimated_1rm}`, each `{workout_id, achieved_at, reps, weight_kg, estimated_1rm_kg}` or `null`. The estimate is Epley's formula and is left out above 12 reps |
 | `GET /workouts/active` | bearer | The workout in progress with its sets, or `null` |

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.exercises.service import visible_to
 from app.models import Exercise, WorkoutSession, WorkoutSet
+from app.templates.service import require_own_template
 
 NOT_FOUND = 404
 CONFLICT = 409
@@ -148,12 +149,20 @@ def _detail(db: Session, workout: WorkoutSession) -> WorkoutDetail:
     return WorkoutDetail(workout=workout, sets=_logged_sets(db, workout.id))
 
 
-def start_workout(db: Session, user_id: uuid.UUID, now: datetime) -> WorkoutDetail:
+def start_workout(
+    db: Session,
+    user_id: uuid.UUID,
+    now: datetime,
+    template_id: uuid.UUID | None = None,
+) -> WorkoutDetail:
+    """Start a workout, blank or from one of the user's templates."""
+    if template_id is not None:
+        require_own_template(db, user_id, template_id)
     # A unique index allows one unfinished workout per user; ON CONFLICT turns a
     # second one into "no row", even when two requests arrive together.
     workout = db.scalars(
         pg_insert(WorkoutSession)
-        .values(user_id=user_id, started_at=now)
+        .values(user_id=user_id, started_at=now, template_id=template_id)
         .on_conflict_do_nothing(
             index_elements=[WorkoutSession.user_id],
             index_where=WorkoutSession.ended_at.is_(None),

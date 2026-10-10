@@ -17,6 +17,7 @@ from app.workouts.schemas import (
     SetResponse,
     SetUpdate,
     WorkoutResponse,
+    WorkoutStart,
     WorkoutSummaryResponse,
 )
 
@@ -31,9 +32,14 @@ router = APIRouter(prefix="/workouts", tags=["workouts"])
 @router.post("", status_code=CREATED)
 @limiter.limit(WRITE_RATE_LIMIT)
 def start_workout(
-    request: Request, user: CurrentUser, db: DbSession
+    request: Request,
+    user: CurrentUser,
+    db: DbSession,
+    # The body may be left out entirely to start a blank workout.
+    body: WorkoutStart | None = None,
 ) -> ApiResponse[WorkoutResponse]:
-    detail = service.start_workout(db, user.id, datetime.now(UTC))
+    template_id = body.template_id if body is not None else None
+    detail = service.start_workout(db, user.id, datetime.now(UTC), template_id)
     return ok(WorkoutResponse.from_detail(detail))
 
 
