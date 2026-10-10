@@ -28,6 +28,7 @@ const WORKOUT: Workout = {
   id: 'workout-1',
   startedAt: '2026-10-09T18:00:00Z',
   endedAt: null,
+  templateId: null,
   sets: [],
 };
 

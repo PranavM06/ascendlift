@@ -5,6 +5,9 @@ import {
   deleteWorkout,
   fetchActiveWorkout,
   fetchLastSets,
+  fetchRecords,
+  fetchWorkout,
+  fetchWorkoutHistory,
   finishWorkout,
   logSet,
   startWorkout,
@@ -42,6 +45,7 @@ const WORKOUT = {
   id: 'workout-1',
   startedAt: '2026-10-09T18:00:00Z',
   endedAt: null,
+  templateId: null,
   sets: [SET],
 };
 
@@ -175,6 +179,117 @@ describe('workouts', () => {
     authorizedRequestMock.mockResolvedValueOnce(body);
 
     await expect(fetchActiveWorkout()).rejects.toThrow('The server sent an unexpected response.');
+  });
+});
+
+describe('history and records', () => {
+  const SUMMARY_JSON = {
+    id: 'workout-0',
+    started_at: '2026-10-02T18:00:00Z',
+    ended_at: '2026-10-02T19:05:00Z',
+    template_id: null,
+    set_count: 3,
+    exercise_names: ['Barbell Deadlift', 'Barbell Squat'],
+    volume_kg: '1500.0000',
+  };
+  const RECORD_JSON = {
+    workout_id: 'workout-0',
+    achieved_at: '2026-10-02T18:00:00Z',
+    reps: 5,
+    weight_kg: '100.0000',
+    estimated_1rm_kg: '116.6667',
+  };
+
+  test('reads a page of finished workouts', async () => {
+    // Arrange
+    authorizedRequestMock.mockResolvedValueOnce({
+      items: [SUMMARY_JSON],
+      total: 41,
+      limit: 20,
+      offset: 20,
+    });
+
+    // Act
+    const page = await fetchWorkoutHistory(20);
+
+    // Assert
+    expect(page).toEqual({
+      items: [
+        {
+          id: 'workout-0',
+          startedAt: '2026-10-02T18:00:00Z',
+          endedAt: '2026-10-02T19:05:00Z',
+          setCount: 3,
+          exerciseNames: ['Barbell Deadlift', 'Barbell Squat'],
+          volumeKg: 1500,
+        },
+      ],
+      total: 41,
+    });
+    expect(authorizedRequestMock).toHaveBeenCalledWith('/workouts?limit=20&offset=20');
+  });
+
+  test('reads one workout by id', async () => {
+    // Arrange
+    authorizedRequestMock.mockResolvedValueOnce({ ...WORKOUT_JSON, template_id: 'template-1' });
+
+    // Act
+    const workout = await fetchWorkout('workout-1');
+
+    // Assert
+    expect(workout).toEqual({ ...WORKOUT, templateId: 'template-1' });
+    expect(authorizedRequestMock).toHaveBeenCalledWith('/workouts/workout-1');
+  });
+
+  test('starts a workout from a template', async () => {
+    // Arrange
+    authorizedRequestMock.mockResolvedValueOnce({ ...WORKOUT_JSON, template_id: 'template-1' });
+
+    // Act
+    await startWorkout('template-1');
+
+    // Assert
+    expect(authorizedRequestMock).toHaveBeenCalledWith('/workouts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template_id: 'template-1' }),
+    });
+  });
+
+  test('reads an exercise’s records, with nulls where there are none', async () => {
+    // Arrange
+    authorizedRequestMock.mockResolvedValueOnce({
+      heaviest: { ...RECORD_JSON, estimated_1rm_kg: null },
+      best_estimated_1rm: RECORD_JSON,
+    });
+    authorizedRequestMock.mockResolvedValueOnce({ heaviest: null, best_estimated_1rm: null });
+
+    // Act
+    const found = await fetchRecords('squat');
+    const none = await fetchRecords('bench');
+
+    // Assert
+    const record = {
+      workoutId: 'workout-0',
+      achievedAt: '2026-10-02T18:00:00Z',
+      reps: 5,
+      weightKg: 100,
+      estimated1rmKg: 116.6667,
+    };
+    expect(found).toEqual({
+      heaviest: { ...record, estimated1rmKg: null },
+      bestEstimated1rm: record,
+    });
+    expect(none).toEqual({ heaviest: null, bestEstimated1rm: null });
+    expect(authorizedRequestMock).toHaveBeenNthCalledWith(1, '/workouts/records?exercise_id=squat');
+  });
+
+  test('rejects a history page whose items are not a list', async () => {
+    authorizedRequestMock.mockResolvedValueOnce({ items: null, total: 0 });
+
+    await expect(fetchWorkoutHistory(0)).rejects.toThrow(
+      'The server sent an unexpected response.'
+    );
   });
 });
 

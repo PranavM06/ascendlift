@@ -1,8 +1,11 @@
 import type { WorkoutSet } from '@/src/api/workouts';
 import {
+  describeRecords,
   describeSet,
   formatDuration,
   formatElapsed,
+  formatVolume,
+  formatWorkoutDate,
   groupSetsByExercise,
   parseSetEntry,
   suggestNextSet,
@@ -114,6 +117,49 @@ describe('formatElapsed', () => {
 
   test('never shows a negative time when the clocks disagree', () => {
     expect(formatElapsed(startedAt, new Date('2026-10-09T17:59:00Z'))).toBe('0:00');
+  });
+});
+
+describe('formatVolume', () => {
+  test('shows the total in the user’s unit as a whole number', () => {
+    expect(formatVolume(1500, 'kg', 'en-US')).toBe('1,500 kg');
+    expect(formatVolume(1500, 'lbs', 'en-US')).toBe('3,307 lb');
+    expect(formatVolume(0, 'kg', 'en-US')).toBe('0 kg');
+  });
+});
+
+describe('formatWorkoutDate', () => {
+  test('shows the weekday, month and day', () => {
+    expect(formatWorkoutDate('2026-10-09T18:00:00', 'en-US')).toBe('Fri, Oct 9');
+  });
+});
+
+describe('describeRecords', () => {
+  const record = {
+    workoutId: 'workout-0',
+    achievedAt: '2026-10-02T18:00:00Z',
+    reps: 5,
+    weightKg: 100,
+    estimated1rmKg: 116.6667,
+  };
+
+  test('shows the heaviest set and the best estimate', () => {
+    const records = {
+      heaviest: { ...record, reps: 1, weightKg: 110, estimated1rmKg: 110 },
+      bestEstimated1rm: record,
+    };
+
+    expect(describeRecords(records, 'kg')).toBe('Best: 110 kg × 1 · est. 1RM 116.25 kg');
+  });
+
+  test('leaves out the estimate when there is none', () => {
+    const records = { heaviest: { ...record, reps: 20, estimated1rmKg: null }, bestEstimated1rm: null };
+
+    expect(describeRecords(records, 'kg')).toBe('Best: 100 kg × 20');
+  });
+
+  test('is null before the exercise has any record', () => {
+    expect(describeRecords({ heaviest: null, bestEstimated1rm: null }, 'kg')).toBeNull();
   });
 });
 

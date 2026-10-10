@@ -1,10 +1,19 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 
 import {
   deleteSet,
   deleteWorkout,
   fetchActiveWorkout,
   fetchLastSets,
+  fetchRecords,
+  fetchWorkout,
+  fetchWorkoutHistory,
   finishWorkout,
   logSet,
   startWorkout,
@@ -17,8 +26,11 @@ import {
 import { clearPickedExercises } from '@/src/training/pickedExercises';
 import { stopRest } from '@/src/training/restTimer';
 
-export const ACTIVE_WORKOUT_QUERY_KEY = ['workouts', 'active'] as const;
-const LAST_SETS_QUERY_KEY = ['workouts', 'last-sets'] as const;
+/** Every workout query's key starts with this, so one call can refresh them all. */
+const WORKOUTS_QUERY_KEY = ['workouts'] as const;
+export const ACTIVE_WORKOUT_QUERY_KEY = [...WORKOUTS_QUERY_KEY, 'active'] as const;
+const LAST_SETS_QUERY_KEY = [...WORKOUTS_QUERY_KEY, 'last-sets'] as const;
+const HISTORY_QUERY_KEY = [...WORKOUTS_QUERY_KEY, 'history'] as const;
 // What was lifted last time cannot change while a workout is in progress.
 const LAST_SETS_STALE_MS = 5 * 60 * 1000;
 
@@ -38,7 +50,45 @@ function closeActiveWorkout(queryClient: QueryClient): void {
   clearPickedExercises();
   stopRest();
   queryClient.setQueryData<ActiveWorkout>(ACTIVE_WORKOUT_QUERY_KEY, null);
-  void queryClient.invalidateQueries({ queryKey: LAST_SETS_QUERY_KEY });
+  // History, records and "last time" all change when a workout ends.
+  void queryClient.invalidateQueries({ queryKey: WORKOUTS_QUERY_KEY });
+}
+
+/** Finished workouts, newest first, loaded a page at a time. */
+export function useWorkoutHistory() {
+  return useInfiniteQuery({
+    queryKey: HISTORY_QUERY_KEY,
+    queryFn: ({ pageParam }) => fetchWorkoutHistory(pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) => {
+      const loadedCount = pages.reduce((count, page) => count + page.items.length, 0);
+      return loadedCount < lastPage.total ? loadedCount : undefined;
+    },
+  });
+}
+
+export function useWorkoutDetail(workoutId: string) {
+  return useQuery({
+    queryKey: [...WORKOUTS_QUERY_KEY, 'detail', workoutId],
+    queryFn: () => fetchWorkout(workoutId),
+  });
+}
+
+export function useRecords(exerciseId: string) {
+  return useQuery({
+    queryKey: [...WORKOUTS_QUERY_KEY, 'records', exerciseId],
+    queryFn: () => fetchRecords(exerciseId),
+    staleTime: LAST_SETS_STALE_MS,
+  });
+}
+
+/** Deletes a finished workout from the history. */
+export function useDeleteFinishedWorkout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteWorkout,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: WORKOUTS_QUERY_KEY }),
+  });
 }
 
 /**
@@ -65,7 +115,8 @@ export function useLastSets(exerciseId: string) {
 export function useStartWorkout() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: startWorkout,
+    // Given a template id, the workout starts from that template.
+    mutationFn: (templateId: string | undefined) => startWorkout(templateId),
     onSuccess: (workout) => {
       queryClient.setQueryData<ActiveWorkout>(ACTIVE_WORKOUT_QUERY_KEY, workout);
     },

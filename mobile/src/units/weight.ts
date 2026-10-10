@@ -1,6 +1,6 @@
 import type { UnitPreference } from '@/src/api/users';
 
-const KG_PER_LB = 0.45359237;
+export const KG_PER_LB = 0.45359237;
 // The backend stores weights in kg with four decimal places, which is enough
 // for a weight entered in pounds to convert back to the same number.
 const STORED_KG_SCALE = 10_000;

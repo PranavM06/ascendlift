@@ -9,8 +9,9 @@ import { userMessage } from '@/src/api/http';
 import type { UnitPreference } from '@/src/api/users';
 import type { WorkoutSet } from '@/src/api/workouts';
 import { startRest } from '@/src/training/restTimer';
-import { useLastSets, useLogSet } from '@/src/training/useWorkout';
+import { useLastSets, useLogSet, useRecords } from '@/src/training/useWorkout';
 import {
+  describeRecords,
   describeSet,
   parseSetEntry,
   suggestNextSet,
@@ -29,6 +30,7 @@ const NO_SETS: WorkoutSet[] = [];
 /** One exercise in the workout: its logged sets and the form for the next one. */
 export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
   const lastSets = useLastSets(group.exercise.id);
+  const records = useRecords(group.exercise.id);
   const logSet = useLogSet(workoutId);
   // null means "not typed in yet", so the field shows the suggested value.
   const [weightText, setWeightText] = useState<string | null>(null);
@@ -42,6 +44,7 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
     ? requestedEditId
     : null;
 
+  const recordsLine = records.data ? describeRecords(records.data, unit) : null;
   const lastTimeSets = lastSets.data?.sets ?? NO_SETS;
   const suggestion = suggestNextSet(group.sets, lastTimeSets);
   const shownWeight =
@@ -78,6 +81,7 @@ export function ExerciseCard({ workoutId, group, unit }: ExerciseCardProps) {
   return (
     <View style={styles.card}>
       <Text style={styles.name}>{group.exercise.name}</Text>
+      {recordsLine ? <Text style={styles.lastTime}>{recordsLine}</Text> : null}
       {lastTimeSets.length > 0 ? (
         <Text style={styles.lastTime}>
           Last time: {lastTimeSets.map((set) => describeSet(set, unit)).join(', ')}

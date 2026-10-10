@@ -39,6 +39,7 @@ export default function TrainingScreen() {
         <Text style={styles.title}>Workout in progress</Text>
         <Text style={styles.detail}>{describeProgress(workout.sets.length)}</Text>
         <Button label="Resume workout" variant="primary" onPress={() => router.push('/workout')} />
+        <Button label="History" onPress={() => router.push('/history')} />
       </View>
     );
   }
@@ -53,6 +54,7 @@ export default function TrainingScreen() {
         onPress={() => start.mutate(undefined, { onSuccess: () => router.push('/workout') })}
         disabled={start.isPending}
       />
+      <Button label="History" onPress={() => router.push('/history')} />
       {start.isError ? (
         <Text style={styles.error} accessibilityRole="alert">
           {userMessage(start.error, "Couldn't start a workout. Try again.")}
