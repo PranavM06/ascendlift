@@ -10,6 +10,8 @@ from app.models import Equipment, Exercise, MuscleGroup
 
 CONFLICT = 409
 DUPLICATE_NAME_MESSAGE = "You already have an exercise with that name"
+# Keeps one account from growing the table, and its own searches, without bound.
+MAX_CUSTOM_EXERCISES_PER_USER = 500
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,20 @@ def create_custom_exercise(
     muscle_groups: list[MuscleGroup],
     equipment: Equipment | None,
 ) -> Exercise:
+    # Two requests arriving together can each pass this check and overshoot by
+    # one, which is acceptable for a limit that only guards against runaway growth.
+    owned_count = db.scalar(
+        select(func.count()).select_from(Exercise).where(Exercise.owner_id == user_id)
+    )
+    if (owned_count or 0) >= MAX_CUSTOM_EXERCISES_PER_USER:
+        raise AppError(
+            status_code=CONFLICT,
+            message=(
+                "You have reached the limit of "
+                f"{MAX_CUSTOM_EXERCISES_PER_USER} custom exercises"
+            ),
+        )
+
     # ON CONFLICT turns a duplicate name into "no row" instead of an error that
     # would abort the transaction.
     created = db.scalars(

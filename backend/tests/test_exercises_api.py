@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.exercises import service as exercises_service
 from tests.support import AppleTokenMinter, sign_in_as
 
 pytestmark = pytest.mark.integration
@@ -170,6 +171,8 @@ def test_offset_continues_where_the_previous_page_stopped(
         pytest.param({"muscle_group": "wings"}, "muscle_group", id="bad-muscle"),
         pytest.param({"equipment": "anvil"}, "equipment", id="bad-equipment"),
         pytest.param({"search": "x" * 101}, "search", id="search-too-long"),
+        pytest.param({"search": "a\x00b"}, "search", id="search-control-character"),
+        pytest.param({"offset": 10**30}, "offset", id="offset-too-large"),
     ],
 )
 def test_listing_rejects_invalid_query_parameters(
@@ -253,6 +256,32 @@ def test_creating_the_same_custom_exercise_twice_is_a_conflict(
     }
 
 
+def test_custom_exercises_stop_at_the_per_user_limit(
+    api_client: TestClient,
+    auth_headers: dict[str, str],
+    other_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange
+    monkeypatch.setattr(exercises_service, "MAX_CUSTOM_EXERCISES_PER_USER", 1)
+    api_client.post("/exercises", headers=auth_headers, json=CUSTOM_EXERCISE)
+
+    # Act
+    over_limit = api_client.post(
+        "/exercises", headers=auth_headers, json={**CUSTOM_EXERCISE, "name": "Other"}
+    )
+    someone_else = api_client.post(
+        "/exercises", headers=other_headers, json=CUSTOM_EXERCISE
+    )
+
+    # Assert
+    assert over_limit.status_code == 409
+    assert over_limit.json()["error"] == (
+        "You have reached the limit of 1 custom exercises"
+    )
+    assert someone_else.status_code == 201
+
+
 def test_two_users_can_each_create_an_exercise_with_the_same_name(
     api_client: TestClient,
     auth_headers: dict[str, str],
@@ -275,6 +304,7 @@ def test_two_users_can_each_create_an_exercise_with_the_same_name(
     [
         pytest.param({"name": "   "}, "name", id="blank-name"),
         pytest.param({"name": "x" * 101}, "name", id="name-too-long"),
+        pytest.param({"name": "Sled\x00Drag"}, "name", id="name-control-character"),
         pytest.param({"muscle_groups": []}, "muscle_groups", id="no-muscles"),
         pytest.param({"muscle_groups": ["wings"]}, "muscle_groups", id="bad-muscle"),
         pytest.param(

@@ -66,7 +66,7 @@ Every response has the shape `{"success": bool, "data": ..., "error": string | n
 | `GET /users/me` | bearer | The signed-in user's profile |
 | `PATCH /users/me` | bearer | Body `{name?, timezone?, unit_preference?}`. Changes only the fields sent |
 | `GET /exercises` | bearer | The shared exercise library plus the user's own exercises, by name. Query `search?`, `muscle_group?`, `equipment?`, `limit?` (default 50, at most 100), `offset?`. Returns `{items, total, limit, offset}` |
-| `POST /exercises` | bearer | Body `{name, muscle_groups, equipment?}`. Adds an exercise only this user can see; 409 if they already have one with that name |
+| `POST /exercises` | bearer | Body `{name, muscle_groups, equipment?}`. Adds an exercise only this user can see; 409 if they already have one with that name, or already have 500 |
 | `POST /workouts` | bearer | Starts a workout; 409 if one is already in progress. Returns `{id, started_at, ended_at, template_id, sets}` |
 | `GET /workouts/active` | bearer | The workout in progress with its sets, or `null` |
 | `GET /workouts/last-sets?exercise_id=` | bearer | The exercise's sets from the latest finished workout that included it, as `{workout_id, started_at, sets}`, or `null` |

@@ -9,10 +9,18 @@ MAX_EXERCISE_NAME_LENGTH = 100
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
 
+# Far past the end of any real library; keeps the value inside a database integer.
+MAX_OFFSET = 100_000
+# Control characters, which include the NUL byte Postgres text cannot store.
+NO_CONTROL_CHARACTERS = r"^[^\x00-\x1f\x7f]*$"
+
 ExerciseName = Annotated[
     str,
     StringConstraints(
-        strip_whitespace=True, min_length=1, max_length=MAX_EXERCISE_NAME_LENGTH
+        strip_whitespace=True,
+        min_length=1,
+        max_length=MAX_EXERCISE_NAME_LENGTH,
+        pattern=NO_CONTROL_CHARACTERS,
     ),
 ]
 
@@ -26,7 +34,7 @@ class ExerciseQuery(BaseModel):
     muscle_group: MuscleGroup | None = None
     equipment: Equipment | None = None
     limit: int = Field(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE)
-    offset: int = Field(default=0, ge=0)
+    offset: int = Field(default=0, ge=0, le=MAX_OFFSET)
 
 
 class ExerciseCreate(BaseModel):
