@@ -24,6 +24,8 @@ class User(Base):
         enum_type(UnitPreference, "unit_preference"),
         server_default=UnitPreference.LBS.value,
     )
+    # Set when the user first finishes onboarding; null until then.
+    onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[CreatedAt]
 
 

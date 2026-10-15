@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Annotated
 from zoneinfo import available_timezones
 
-from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, StringConstraints
 
 from app.models import UnitPreference
 
@@ -15,6 +15,15 @@ PersonName = Annotated[
 ]
 
 
+def _require_iana_timezone(value: str) -> str:
+    if value not in available_timezones():
+        raise ValueError("must be an IANA timezone name such as 'America/Chicago'")
+    return value
+
+
+IanaTimezone = Annotated[str, AfterValidator(_require_iana_timezone)]
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -23,6 +32,8 @@ class UserResponse(BaseModel):
     email: str | None
     timezone: str
     unit_preference: UnitPreference
+    # Null until the user finishes onboarding.
+    onboarded_at: datetime | None
     created_at: datetime
 
 
@@ -32,12 +43,5 @@ class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: PersonName | None = None
-    timezone: str | None = None
+    timezone: IanaTimezone | None = None
     unit_preference: UnitPreference | None = None
-
-    @field_validator("timezone")
-    @classmethod
-    def require_iana_timezone(cls, value: str | None) -> str | None:
-        if value is not None and value not in available_timezones():
-            raise ValueError("must be an IANA timezone name such as 'America/Chicago'")
-        return value
