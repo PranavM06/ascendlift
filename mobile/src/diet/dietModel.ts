@@ -90,6 +90,23 @@ export function formatGrams(grams: number): string {
   return `${Math.round(grams)} g`;
 }
 
+/** Grams eaten against a target, such as "73 / 180 g". */
+export function formatGramsOfTarget(grams: number, targetGrams: number): string {
+  return `${Math.round(grams)} / ${formatGrams(targetGrams)}`;
+}
+
+/** How far a day is from its calorie target, such as "1,912 kcal left" or "50 kcal over". */
+export function describeCaloriesLeft(
+  calories: number,
+  targetCalories: number,
+  locale?: string
+): string {
+  const left = Math.round(targetCalories) - Math.round(calories);
+  return left >= 0
+    ? `${formatCalories(left, locale)} left`
+    : `${formatCalories(-left, locale)} over`;
+}
+
 /** One line of protein, carbs and fat, such as "P 31 g · C 0 g · F 4 g". */
 export function describeMacros(macros: Macros): string {
   return [

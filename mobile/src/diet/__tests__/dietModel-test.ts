@@ -3,11 +3,13 @@ import type { Food } from '@/src/api/foods';
 import {
   amountTextFor,
   describeAmount,
+  describeCaloriesLeft,
   describeDay,
   describeFood,
   describeMacros,
   formatCalories,
   formatGrams,
+  formatGramsOfTarget,
   groupEntriesByMeal,
   isDateKey,
   parseServings,
@@ -184,5 +186,23 @@ describe('the linked servings and amount fields', () => {
   test('stored servings are shown without trailing zeros', () => {
     expect(toServingsText(1)).toBe('1');
     expect(toServingsText(1.5)).toBe('1.5');
+  });
+});
+
+describe('progress against targets', () => {
+  test('grams eaten are shown against the target, rounded', () => {
+    expect(formatGramsOfTarget(72.55, 180)).toBe('73 / 180 g');
+  });
+
+  test('calories under the target are what is left', () => {
+    expect(describeCaloriesLeft(487.5, 2400, 'en-US')).toBe('1,912 kcal left');
+  });
+
+  test('calories past the target are how far over it went', () => {
+    expect(describeCaloriesLeft(2450.4, 2400, 'en-US')).toBe('50 kcal over');
+  });
+
+  test('a day exactly on target has nothing left', () => {
+    expect(describeCaloriesLeft(2400, 2400, 'en-US')).toBe('0 kcal left');
   });
 });

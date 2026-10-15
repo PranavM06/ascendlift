@@ -15,6 +15,7 @@ import {
   type FoodLogEntry,
 } from '@/src/api/foodLog';
 import { fetchRecentFoods, searchFoods, type Food } from '@/src/api/foods';
+import { fetchTargets } from '@/src/api/targets';
 import { shiftDateKey, toDateKey } from '@/src/diet/dietModel';
 import { startEditingEntry, startNewEntry, useEntryDraft } from '@/src/diet/entryDraft';
 
@@ -31,8 +32,13 @@ jest.mock('@/src/api/foodLog', () => ({
   updateFoodLogEntry: jest.fn(),
   deleteFoodLogEntry: jest.fn(),
 }));
+jest.mock('@/src/api/targets', () => ({
+  ...jest.requireActual('@/src/api/targets'),
+  fetchTargets: jest.fn(),
+}));
 
 const fetchDayMock = jest.mocked(fetchDay);
+const fetchTargetsMock = jest.mocked(fetchTargets);
 const logFoodMock = jest.mocked(logFood);
 const updateFoodLogEntryMock = jest.mocked(updateFoodLogEntry);
 const deleteFoodLogEntryMock = jest.mocked(deleteFoodLogEntry);
@@ -117,6 +123,7 @@ async function renderScreen(screenElement: ReactElement) {
 beforeEach(() => {
   for (const mock of [
     fetchDayMock,
+    fetchTargetsMock,
     logFoodMock,
     updateFoodLogEntryMock,
     deleteFoodLogEntryMock,
@@ -130,6 +137,7 @@ beforeEach(() => {
   useEntryDraft.setState({ draft: null });
   useLocalSearchParamsMock.mockReturnValue({ meal: 'lunch', date: YESTERDAY });
   fetchDayMock.mockResolvedValue(DAY);
+  fetchTargetsMock.mockResolvedValue(null);
   fetchRecentFoodsMock.mockResolvedValue([YOGURT]);
 });
 
@@ -150,6 +158,27 @@ describe('Diet tab', () => {
       expect(screen.getByText(meal)).toBeTruthy();
     }
     expect(fetchDayMock).toHaveBeenCalledWith(TODAY);
+  });
+
+  test('shows the day’s totals against its targets', async () => {
+    // Arrange
+    fetchTargetsMock.mockResolvedValue({
+      calories: 2400,
+      proteinG: 180,
+      carbsG: 250,
+      fatG: 70,
+      effectiveDate: TODAY,
+    });
+
+    // Act
+    await renderScreen(<DietScreen />);
+
+    // Assert: 2,400 - 488 kcal eaten leaves 1,912.
+    expect(await screen.findByText(/of 2.400 kcal · 1.912 kcal left/)).toBeTruthy();
+    expect(screen.getByText('73 / 180 g')).toBeTruthy();
+    expect(screen.getByText('32 / 250 g')).toBeTruthy();
+    expect(screen.getByText('5 / 70 g')).toBeTruthy();
+    expect(fetchTargetsMock).toHaveBeenCalledWith(TODAY);
   });
 
   test('steps back to past days and returns to today', async () => {

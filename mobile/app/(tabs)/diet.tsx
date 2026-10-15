@@ -15,7 +15,7 @@ import {
   toDateKey,
 } from '@/src/diet/dietModel';
 import { startEditingEntry } from '@/src/diet/entryDraft';
-import { useDay } from '@/src/diet/useDiet';
+import { useDay, useTargets } from '@/src/diet/useDiet';
 
 function openEntry(entry: FoodLogEntry) {
   startEditingEntry(entry);
@@ -44,6 +44,9 @@ export default function DietScreen() {
   const [pastDate, setPastDate] = useState<string | null>(null);
   const entryDate = pastDate ?? today;
   const day = useDay(entryDate);
+  // Targets only add to the totals: while they load, or if they fail, the
+  // totals are shown on their own.
+  const targets = useTargets(entryDate);
   const isToday = pastDate === null;
 
   function showDate(dateKey: string) {
@@ -85,7 +88,7 @@ export default function DietScreen() {
       ) : null}
       {day.isSuccess ? (
         <>
-          <DayTotals totals={day.data.totals} />
+          <DayTotals totals={day.data.totals} targets={targets.data ?? null} />
           {groupEntriesByMeal(day.data.entries).map((group) => (
             <MealSection
               key={group.meal}

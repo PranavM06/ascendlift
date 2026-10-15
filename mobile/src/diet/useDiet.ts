@@ -14,6 +14,7 @@ import {
   type FoodLogChanges,
 } from '@/src/api/foodLog';
 import { fetchRecentFoods, MIN_FOOD_SEARCH_LENGTH, searchFoods } from '@/src/api/foods';
+import { fetchTargets, TARGETS_QUERY_KEY } from '@/src/api/targets';
 
 /** Every diet query's key starts with this. */
 const DIET_QUERY_KEY = ['diet'] as const;
@@ -34,6 +35,14 @@ function refreshLog(queryClient: QueryClient): Promise<unknown> {
 /** What the user logged on the day given as "YYYY-MM-DD". */
 export function useDay(entryDate: string) {
   return useQuery({ queryKey: [...DAY_QUERY_KEY, entryDate], queryFn: () => fetchDay(entryDate) });
+}
+
+/** The calorie and macro targets in effect on the day given as "YYYY-MM-DD". */
+export function useTargets(onDate: string) {
+  return useQuery({
+    queryKey: [...TARGETS_QUERY_KEY, onDate],
+    queryFn: () => fetchTargets(onDate),
+  });
 }
 
 /** Foods matching the search. A search too short to send loads nothing. */

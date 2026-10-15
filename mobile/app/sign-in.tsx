@@ -5,7 +5,7 @@ import { ActivityIndicator, StyleSheet } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { useColorScheme } from '@/components/useColorScheme';
 import { userMessage } from '@/src/api/http';
-import { signIn } from '@/src/auth/session';
+import { signIn, useSession } from '@/src/auth/session';
 
 const APPLE_BUTTON_CORNER_RADIUS = 8;
 
@@ -16,6 +16,9 @@ export default function SignInScreen() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const signInStarted = useRef(false);
+  // Signed in, but this screen stays up until the profile says where to go next.
+  const isOpeningApp = useSession((session) => session.status === 'signedIn');
+  const isBusy = isSigningIn || isOpeningApp;
 
   useEffect(() => {
     AppleAuthentication.isAvailableAsync()
@@ -48,8 +51,8 @@ export default function SignInScreen() {
       <Text style={styles.tagline}>Track your lifting and your macros.</Text>
 
       <View style={styles.action}>
-        {isSigningIn ? <ActivityIndicator /> : null}
-        {!isSigningIn && isAppleAvailable ? (
+        {isBusy ? <ActivityIndicator /> : null}
+        {!isBusy && isAppleAvailable ? (
           <AppleAuthentication.AppleAuthenticationButton
             buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
             buttonStyle={

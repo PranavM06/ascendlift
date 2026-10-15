@@ -86,8 +86,10 @@ Every response has the shape `{"success": bool, "data": ..., "error": string | n
 | `POST /auth/apple` | none | Body `{identity_token, nonce, name?}`. Verifies the Apple identity token, creates the user on first sign-in, returns `{access_token, refresh_token, token_type, expires_in}` |
 | `POST /auth/refresh` | none | Body `{refresh_token}`. Returns a new pair; the old refresh token stops working |
 | `POST /auth/logout` | none | Body `{refresh_token}`. Revokes it |
-| `GET /users/me` | bearer | The signed-in user's profile |
+| `GET /users/me` | bearer | The signed-in user's profile: `{id, name, email, timezone, unit_preference, onboarded_at, created_at}`. `onboarded_at` is null until onboarding is finished |
 | `PATCH /users/me` | bearer | Body `{name?, timezone?, unit_preference?}`. Changes only the fields sent |
+| `POST /onboarding` | bearer | Body `{unit_preference, timezone, training_style, phase, targets: {calories, protein_g, carbs_g, fat_g}, bodyweight_kg}`. Saves the units, time zone, goal, targets and starting bodyweight together and returns the profile with `onboarded_at` set. `training_style` is `powerlifting`, `bodybuilding` or `general_strength`; `phase` is `cut`, `maintain` or `bulk`. Calories run from 500 to 10,000, each macro from 0 to 1,000 g, and bodyweight from 20 to 400 kg. The targets and weigh-in are dated today in the given time zone. Sending it again replaces that day's answers and keeps the first `onboarded_at` |
+| `GET /targets?on_date=` | bearer | The targets in effect on a day, the latest set on or before it: `{calories, protein_g, carbs_g, fat_g, effective_date}`, or `null` if none had been set by then |
 | `GET /exercises` | bearer | The shared exercise library plus the user's own exercises, by name. Query `search?`, `muscle_group?`, `equipment?`, `limit?` (default 50, at most 100), `offset?`. Returns `{items, total, limit, offset}` |
 | `POST /exercises` | bearer | Body `{name, muscle_groups, equipment?}`. Adds an exercise only this user can see; 409 if they already have one with that name, or already have 500 |
 | `GET /templates` | bearer | The user's routine templates by name, each `{id, name, notes, exercises}`. An exercise entry is `{id, exercise: {id, name}, position, target_sets, rep_min, rep_max, target_weight_kg, target_rpe}` |
