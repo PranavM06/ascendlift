@@ -1,7 +1,8 @@
-"""Helpers shared by the API tests: a fake Apple key server and token minter."""
+"""Helpers shared by the API tests: fake Apple keys, a token minter, a fake USDA."""
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
 
 import jwt
@@ -11,11 +12,51 @@ from jwt import PyJWKClient
 from jwt.exceptions import PyJWKClientConnectionError
 
 from app.auth.apple import APPLE_ISSUER, hash_nonce
+from app.foods.usda import FoodSourceError, SourceFood
 
 TEST_APPLE_AUDIENCE = "host.exp.Exponent"
 APPLE_KEY_ID = "test-key-1"
 RAW_NONCE = "raw-nonce-0123456789abcdef"
 DEFAULT_TOKEN_LIFETIME_SECONDS = 600
+
+
+CHICKEN = SourceFood(
+    source_id="usda:171077",
+    name="Chicken breast, grilled",
+    brand=None,
+    serving_size=Decimal("100.00"),
+    serving_unit="g",
+    calories=Decimal("165.00"),
+    protein_g=Decimal("31.02"),
+    carbs_g=Decimal("0.00"),
+    fat_g=Decimal("3.57"),
+)
+YOGURT = SourceFood(
+    source_id="usda:2038865",
+    name="Greek Yogurt",
+    brand="Chobani",
+    serving_size=Decimal("150.00"),
+    serving_unit="g",
+    calories=Decimal("120.00"),
+    protein_g=Decimal("13.01"),
+    carbs_g=Decimal("16.05"),
+    fat_g=Decimal("0.00"),
+)
+
+
+@dataclass
+class FakeFoodSource:
+    """Stands in for USDA: returns the foods it was given and records each search."""
+
+    foods: list[SourceFood] = field(default_factory=lambda: [CHICKEN, YOGURT])
+    is_down: bool = False
+    queries: list[str] = field(default_factory=list)
+
+    def search(self, query: str) -> list[SourceFood]:
+        self.queries.append(query)
+        if self.is_down:
+            raise FoodSourceError("USDA could not be reached")
+        return list(self.foods)
 
 
 def generate_rsa_key() -> rsa.RSAPrivateKey:

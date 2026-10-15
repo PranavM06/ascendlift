@@ -25,6 +25,8 @@ uv run alembic upgrade head     # create or update the tables
 uv run uvicorn app.main:app --reload
 ```
 
+Food search works out of the box with USDA's shared `DEMO_KEY`, which allows only a few dozen searches an hour. For daily use, get a free key at <https://fdc.nal.usda.gov/api-key-signup> and set `ASCENDLIFT_USDA_API_KEY` in `.env`; production refuses to start with the demo key.
+
 `GET http://localhost:8000/health` returns `{"success": true, "data": {"status": "ok", "database": "ok"}, "error": null}`. Interactive API docs are at `/docs`.
 
 ## Running the app on an iPhone
@@ -43,7 +45,28 @@ npm install
 npx expo start                  # scan the QR code with the iPhone camera
 ```
 
-Sign in with Apple works in Expo Go because the backend accepts Expo Go's audience (`host.exp.Exponent`) in development. A standalone build needs the app's own bundle id in `ASCENDLIFT_APPLE_AUDIENCES`.
+Sign in with Apple works in the App Store's Expo Go because the backend accepts Expo Go's audience (`host.exp.Exponent`) in development. When the App Store's Expo Go is older than this project's Expo SDK, or was built with `eas go`, it has no Sign in with Apple and the sign-in screen says so; use a development build instead.
+
+### Development build
+
+A development build is the AscendLift app itself, with a menu for loading code from this Mac. It needs an Apple Developer account and an [Expo account](https://expo.dev/signup).
+
+```bash
+cd mobile
+npx eas-cli@latest login
+npx eas-cli@latest device:create                                   # once per iPhone: open the link on the phone and install the profile
+npx eas-cli@latest build --profile development --platform ios      # about 15 minutes, in the cloud
+```
+
+When the build finishes, scan its QR code with the iPhone camera to install it, turn on Developer Mode (Settings > Privacy & Security) if iOS asks, then run `npx expo start` and open AscendLift on the phone.
+
+The backend must trust the app's bundle id, so `backend/.env` needs it in the list, followed by a backend restart:
+
+```
+ASCENDLIFT_APPLE_AUDIENCES=["host.exp.Exponent", "com.pranavmeka.ascendlift"]
+```
+
+A new build is only needed after adding a library with native code or changing `app.json`; everyday code changes load from `npx expo start`.
 
 App checks, run from `mobile/`:
 
@@ -63,8 +86,10 @@ Every response has the shape `{"success": bool, "data": ..., "error": string | n
 | `POST /auth/apple` | none | Body `{identity_token, nonce, name?}`. Verifies the Apple identity token, creates the user on first sign-in, returns `{access_token, refresh_token, token_type, expires_in}` |
 | `POST /auth/refresh` | none | Body `{refresh_token}`. Returns a new pair; the old refresh token stops working |
 | `POST /auth/logout` | none | Body `{refresh_token}`. Revokes it |
-| `GET /users/me` | bearer | The signed-in user's profile |
+| `GET /users/me` | bearer | The signed-in user's profile: `{id, name, email, timezone, unit_preference, onboarded_at, created_at}`. `onboarded_at` is null until onboarding is finished |
 | `PATCH /users/me` | bearer | Body `{name?, timezone?, unit_preference?}`. Changes only the fields sent |
+| `POST /onboarding` | bearer | Body `{unit_preference, timezone, training_style, phase, targets: {calories, protein_g, carbs_g, fat_g}, bodyweight_kg}`. Saves the units, time zone, goal, targets and starting bodyweight together and returns the profile with `onboarded_at` set. `training_style` is `powerlifting`, `bodybuilding` or `general_strength`; `phase` is `cut`, `maintain` or `bulk`. Calories run from 500 to 10,000, each macro from 0 to 1,000 g, and bodyweight from 20 to 400 kg. The targets and weigh-in are dated today in the given time zone. Sending it again replaces that day's answers and keeps the first `onboarded_at` |
+| `GET /targets?on_date=` | bearer | The targets in effect on a day, the latest set on or before it: `{calories, protein_g, carbs_g, fat_g, effective_date}`, or `null` if none had been set by then |
 | `GET /exercises` | bearer | The shared exercise library plus the user's own exercises, by name. Query `search?`, `muscle_group?`, `equipment?`, `limit?` (default 50, at most 100), `offset?`. Returns `{items, total, limit, offset}` |
 | `POST /exercises` | bearer | Body `{name, muscle_groups, equipment?}`. Adds an exercise only this user can see; 409 if they already have one with that name, or already have 500 |
 | `GET /templates` | bearer | The user's routine templates by name, each `{id, name, notes, exercises}`. An exercise entry is `{id, exercise: {id, name}, position, target_sets, rep_min, rep_max, target_weight_kg, target_rpe}` |
@@ -83,8 +108,16 @@ Every response has the shape `{"success": bool, "data": ..., "error": string | n
 | `POST /workouts/{id}/sets` | bearer | Body `{exercise_id, reps, weight_kg, rpe?}`. Appends a set and returns `{id, exercise: {id, name}, position, reps, weight_kg, rpe}` |
 | `PATCH /workouts/{id}/sets/{set_id}` | bearer | Body `{reps?, weight_kg?, rpe?}`. Changes only the fields sent; `rpe: null` clears it |
 | `DELETE /workouts/{id}/sets/{set_id}` | bearer | Removes the set |
+| `GET /foods?search=` | bearer | Up to 25 foods matching the search (at least 2 characters), best match first, each `{id, name, brand, serving_size, serving_unit, calories, protein_g, carbs_g, fat_g}`. Nutrients are for one serving: the label's serving for packaged foods, 100 g for generic ones. 503 if USDA cannot be reached and the search is not cached |
+| `GET /foods/recent` | bearer | The 20 foods the user logged most recently, each once, latest first |
+| `GET /food-log?entry_date=` | bearer | One day of the user's food log: `{entry_date, totals, entries}`. `totals` is `{calories, protein_g, carbs_g, fat_g}`; an entry is `{id, food, servings, meal, entry_date, calories, protein_g, carbs_g, fat_g}` with nutrients for the servings logged |
+| `POST /food-log` | bearer | Body `{food_id, servings, meal, entry_date}`. `meal` is `breakfast`, `lunch`, `dinner` or `snack`; `servings` is above 0, at most 100, with up to two decimal places. At most 200 entries a day |
+| `PATCH /food-log/{id}` | bearer | Body `{servings?, meal?}`. Changes only the fields sent |
+| `DELETE /food-log/{id}` | bearer | Removes the entry |
 
 Weights are always kilograms: at most four decimal places going in, and a string such as `"102.0583"` coming out so no precision is lost. RPE runs from 1 to 10 in half steps. Endpoints that write allow 120 requests a minute per client address.
+
+Food data comes from [USDA FoodData Central](https://fdc.nal.usda.gov/). The backend keeps every food it has seen and remembers each search for 30 days, so a repeated search does not reach USDA at all. Food search allows 60 requests a minute per client address. Dates such as `entry_date` are the user's own calendar day, as `YYYY-MM-DD`.
 
 Sign-in works like this:
 

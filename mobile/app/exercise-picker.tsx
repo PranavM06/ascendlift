@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { Button } from '@/components/Button';
@@ -15,19 +15,11 @@ import {
 import { userMessage } from '@/src/api/http';
 import { deliverPick, toPickTarget } from '@/src/training/pickedExercises';
 import { useActiveWorkout } from '@/src/training/useWorkout';
+import { useDebounced } from '@/src/useDebounced';
 
 // Long enough that typing a word sends one search, not one per letter.
 const SEARCH_DEBOUNCE_MS = 250;
 const PLACEHOLDER_COLOR = '#888';
-
-function useDebounced(value: string, delayMs: number): string {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
-}
 
 function describeExercise(exercise: Exercise): string {
   const details = [...exercise.muscleGroups.slice(0, 2), exercise.equipment ?? ''];

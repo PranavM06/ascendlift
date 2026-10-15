@@ -81,12 +81,39 @@ def test_production_settings_accept_a_real_bundle_id(
     # Arrange
     monkeypatch.setenv("ASCENDLIFT_ENVIRONMENT", "production")
     monkeypatch.setenv("ASCENDLIFT_APPLE_AUDIENCES", '["com.ascendlift.app"]')
+    monkeypatch.setenv("ASCENDLIFT_USDA_API_KEY", "a-real-usda-key")
 
     # Act
     settings = Settings(_env_file=None)
 
     # Assert
     assert settings.apple_audiences == ("com.ascendlift.app",)
+
+
+def test_settings_default_to_the_usda_demo_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange
+    monkeypatch.delenv("ASCENDLIFT_USDA_API_KEY", raising=False)
+
+    # Act
+    settings = Settings(_env_file=None)
+
+    # Assert
+    assert settings.usda_api_key.get_secret_value() == "DEMO_KEY"
+
+
+def test_production_settings_reject_the_usda_demo_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange: the demo key allows only a few dozen searches an hour.
+    monkeypatch.setenv("ASCENDLIFT_ENVIRONMENT", "production")
+    monkeypatch.setenv("ASCENDLIFT_APPLE_AUDIENCES", '["com.ascendlift.app"]')
+    monkeypatch.delenv("ASCENDLIFT_USDA_API_KEY", raising=False)
+
+    # Act / Assert
+    with pytest.raises(ValidationError, match="usda_api_key"):
+        Settings(_env_file=None)
 
 
 @pytest.mark.parametrize("secret", ["", "too-short"])

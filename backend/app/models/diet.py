@@ -1,8 +1,17 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Numeric, String
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Uuid,
+)
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, CreatedAt, UuidPk, enum_type, user_fk
@@ -24,6 +33,8 @@ class Food(Base):
     id: Mapped[UuidPk]
     source_id: Mapped[str] = mapped_column(String(100), unique=True)
     name: Mapped[str] = mapped_column(String(255))
+    # Who makes it, for packaged foods; null for generic ones such as "Egg, raw".
+    brand: Mapped[str | None] = mapped_column(String(100))
     serving_size: Mapped[Decimal] = mapped_column(Numeric(8, 2))
     serving_unit: Mapped[str] = mapped_column(String(20))
     # Nutrients are per serving.
@@ -32,6 +43,20 @@ class Food(Base):
     carbs_g: Mapped[Decimal] = mapped_column(Numeric(6, 2))
     fat_g: Mapped[Decimal] = mapped_column(Numeric(6, 2))
     created_at: Mapped[CreatedAt]
+
+
+class FoodSearch(Base):
+    """What the external source returned for one search, so repeats skip it."""
+
+    __tablename__ = "food_searches"
+
+    id: Mapped[UuidPk]
+    # Lower case with single spaces, so "Greek  Yogurt" and "greek yogurt" share
+    # a row.
+    query: Mapped[str] = mapped_column(String(100), unique=True)
+    # Best match first. Foods are never deleted, so the ids stay valid.
+    food_ids: Mapped[list[uuid.UUID]] = mapped_column(ARRAY(Uuid))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class FoodLogEntry(Base):

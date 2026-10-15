@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ScrollView, StyleSheet, TextInput } from 'react-native';
 
 import { Button } from '@/components/Button';
+import { Chip } from '@/components/Chip';
 import { Text, useThemeColor, View } from '@/components/Themed';
 import {
   createExercise,
@@ -18,21 +19,6 @@ import { deliverPick, toPickTarget } from '@/src/training/pickedExercises';
 import { useActiveWorkout } from '@/src/training/useWorkout';
 
 const PLACEHOLDER_COLOR = '#888';
-const BRAND_BLUE = '#2f95dc';
-
-type ChipProps = { label: string; isSelected: boolean; onPress: () => void };
-
-function Chip({ label, isSelected, onPress }: ChipProps) {
-  return (
-    <Pressable
-      style={[styles.chip, isSelected ? styles.chipSelected : null]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: isSelected }}>
-      <Text style={isSelected ? styles.chipLabelSelected : styles.chipLabel}>{label}</Text>
-    </Pressable>
-  );
-}
 
 export default function NewExerciseScreen() {
   const textColor = useThemeColor({}, 'text');
@@ -161,24 +147,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#888',
-  },
-  chipSelected: {
-    backgroundColor: BRAND_BLUE,
-    borderColor: BRAND_BLUE,
-  },
-  chipLabel: {
-    fontSize: 14,
-  },
-  chipLabelSelected: {
-    fontSize: 14,
-    color: '#fff',
   },
   error: {
     fontSize: 15,

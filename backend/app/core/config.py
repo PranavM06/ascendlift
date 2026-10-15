@@ -10,6 +10,9 @@ from sqlalchemy.exc import ArgumentError
 DATABASE_DRIVER = "postgresql+psycopg"
 MIN_JWT_SECRET_LENGTH = 32
 EXPO_GO_AUDIENCE = "host.exp.Exponent"
+# USDA's shared key: enough to try food search, but limited to a few dozen
+# requests an hour for everyone using it from the same address.
+USDA_DEMO_API_KEY = "DEMO_KEY"
 
 
 class Settings(BaseSettings):
@@ -31,6 +34,9 @@ class Settings(BaseSettings):
     apple_audiences: tuple[str, ...] = Field(min_length=1)
     access_token_ttl_minutes: int = Field(default=15, gt=0)
     refresh_token_ttl_days: int = Field(default=30, gt=0)
+    # For USDA FoodData Central, where food search gets its data. Free from
+    # https://fdc.nal.usda.gov/api-key-signup
+    usda_api_key: SecretStr = Field(default=SecretStr(USDA_DEMO_API_KEY), min_length=1)
 
     @field_validator("database_url")
     @classmethod
@@ -53,6 +59,17 @@ class Settings(BaseSettings):
         ):
             raise ValueError(
                 f"apple_audiences must not include '{EXPO_GO_AUDIENCE}' in production"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def forbid_usda_demo_key_in_production(self) -> Self:
+        if (
+            self.environment == "production"
+            and self.usda_api_key.get_secret_value() == USDA_DEMO_API_KEY
+        ):
+            raise ValueError(
+                f"usda_api_key must not be '{USDA_DEMO_API_KEY}' in production"
             )
         return self
 

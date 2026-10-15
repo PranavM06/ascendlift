@@ -91,6 +91,7 @@ def test_profile_returns_the_signed_in_user_without_internal_fields(
         "email",
         "timezone",
         "unit_preference",
+        "onboarded_at",
         "created_at",
     }
 
